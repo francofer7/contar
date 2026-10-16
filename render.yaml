@@ -8,7 +8,6 @@ services:
     buildCommand: ./bin/render-build.sh
     startCommand: bundle exec puma -C config/puma.rb
     healthCheckPath: /health
-    initialDeployHook: bundle exec rails db:seed
     autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
@@ -19,6 +18,10 @@ services:
         sync: false
       - key: CONTAR_ADMIN_PASSWORD
         sync: false
+      - key: CONTAR_ADMIN_PHONE
+        sync: false
+      - key: CONTAR_ADMIN_PHONE_COUNTRY
+        value: AR
       - key: RAILS_ENV
         value: production
       - key: RAILS_LOG_LEVEL

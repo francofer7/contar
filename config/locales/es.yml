@@ -11,6 +11,8 @@ es:
       user:
         name: Nombre
         email: Correo electrónico
+        phone: Teléfono
+        phone_country: País del teléfono
         password: Contraseña
         password_confirmation: Confirmación de contraseña
         role: Rol

@@ -9,6 +9,18 @@
   <%= link_to "+ Nuevo usuario", new_admin_user_path, class: "button primary" %>
 </section>
 
+<% if (access = flash[:created_user_access]) %>
+  <section class="access-share" role="status">
+    <div>
+      <strong>El acceso de <%= access["name"] %> está listo.</strong>
+      <span>La contraseña temporal sólo se muestra en el mensaje de esta pantalla.</span>
+    </div>
+    <%= link_to "Enviar acceso por WhatsApp",
+      whatsapp_url(access["phone"], message: access_message(name: access["name"], email: access["email"], password: access["password"])),
+      class: "button whatsapp", target: "_blank", rel: "noopener noreferrer" %>
+  </section>
+<% end %>
+
 <section class="table-card">
   <div class="table-wrap">
     <table>
@@ -16,11 +28,14 @@
       <tbody>
         <% @users.each do |user| %>
           <tr>
-            <td><div class="user-cell"><span class="avatar"><%= initials(user.name) %></span><div><strong><%= user.name %></strong><small><%= user.email %></small></div></div></td>
+            <td><div class="user-cell"><span class="avatar"><%= initials(user.name) %></span><div><strong><%= user.name %></strong><small><%= user.email %></small><small><%= user.phone.presence || "Teléfono pendiente" %></small></div></div></td>
             <td><span class="role-badge <%= user.role %>"><%= role_label(user) %></span></td>
             <td class="muted"><%= user.admin? ? "Todas" : (user.assigned_converters.map(&:name).join(", ").presence || "Sin asignar") %></td>
             <td><span class="status <%= user.active? ? 'on' : 'off' %>"><%= user.active? ? "Activo" : "Inactivo" %></span></td>
             <td class="actions">
+              <% if user.phone.present? %>
+                <%= link_to "Enviar acceso", whatsapp_url(user.phone, message: access_message(name: user.name, email: user.email)), class: "text-link whatsapp-link", target: "_blank", rel: "noopener noreferrer" %>
+              <% end %>
               <%= link_to "Editar", edit_admin_user_path(user), class: "text-link" %>
               <% unless user == current_user %>
                 <%= button_to "Eliminar", admin_user_path(user), method: :delete, class: "danger-link", form: { data: { turbo_confirm: "¿Eliminar a #{user.name}?" } } %>

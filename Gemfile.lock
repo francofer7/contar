@@ -163,6 +163,7 @@ GEM
       racc
     pg (1.6.3-arm64-darwin)
     pg (1.6.3-x86_64-linux)
+    phonelib (0.10.27)
     pp (0.6.4)
       prettyprint
     prettyprint (0.2.0)
@@ -310,6 +311,7 @@ DEPENDENCIES
   error_highlight (>= 0.4.0)
   importmap-rails
   pg (~> 1.6)
+  phonelib (~> 0.10)
   puma (>= 5.0)
   rails (~> 7.2.4)
   rubocop-rails-omakase

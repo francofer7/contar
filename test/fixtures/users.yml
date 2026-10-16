@@ -3,6 +3,8 @@
 admin:
   name: Ada Administradora
   email: admin@example.com
+  phone: "+5493515550001"
+  phone_country: AR
   password_digest: <%= BCrypt::Password.create("password123") %>
   role: 1
   active: true
@@ -10,6 +12,8 @@ admin:
 operator:
   name: Oscar Operario
   email: operator@example.com
+  phone: "+5493515550002"
+  phone_country: AR
   password_digest: <%= BCrypt::Password.create("password123") %>
   role: 0
   active: true
@@ -17,6 +21,8 @@ operator:
 inactive:
   name: Inés Inactiva
   email: inactive@example.com
+  phone: "+5493515550003"
+  phone_country: AR
   password_digest: <%= BCrypt::Password.create("password123") %>
   role: 0
   active: false

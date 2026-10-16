@@ -41,8 +41,17 @@ class AccessControlTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "Extractos bancarios"
     assert_select "h2", text: "Tarjetas de crédito"
 
+    get converter_path(converters(:cards).key)
+    assert_response :success
+
     get admin_users_path
     assert_response :success
+
+    get new_admin_user_path
+    assert_response :success
+    assert_select "select.phone-country-select[name='user[phone_country]'] option[value='AR'][selected]", text: /🇦🇷 AR \+54/
+    assert_select "select.phone-country-select option[value='US']", text: /🇺🇸 US \+1/
+    assert_select "input[name='user[phone]'][placeholder='Código de área y número']"
   end
 
   test "inactive user cannot sign in" do

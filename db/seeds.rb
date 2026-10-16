@@ -25,12 +25,14 @@ end
 if Rails.env.production?
   admin_email = ENV.fetch("CONTAR_ADMIN_EMAIL")
   admin_password = ENV.fetch("CONTAR_ADMIN_PASSWORD")
+  admin_phone = ENV.fetch("CONTAR_ADMIN_PHONE")
 else
   admin_email = ENV.fetch("CONTAR_ADMIN_EMAIL", "admin@contar.local")
   admin_password = ENV.fetch("CONTAR_ADMIN_PASSWORD", "Cambiar123!")
+  admin_phone = ENV.fetch("CONTAR_ADMIN_PHONE", "3515550000")
 end
 admin = User.find_or_initialize_by(email: admin_email)
-admin.assign_attributes(name: "Administrador", role: :admin, active: true)
+admin.assign_attributes(name: "Administrador", phone_country: ENV.fetch("CONTAR_ADMIN_PHONE_COUNTRY", "AR"), phone: admin_phone, role: :admin, active: true)
 admin.password = admin_password if admin.new_record?
 admin.password_confirmation = admin_password if admin.new_record?
 admin.save!

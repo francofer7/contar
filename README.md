@@ -6,10 +6,11 @@ La aplicación usa PostgreSQL en desarrollo, pruebas y producción.
 
 ## Funcionalidad actual
 
-- Administradores: acceso total, alta/edición/baja de usuarios y asignación de herramientas.
+- Administradores: acceso total, alta/edición/baja de usuarios, asignación de herramientas y envío de accesos por WhatsApp.
 - Operarios: acceso exclusivo a los convertidores que tengan asignados.
 - Convertidor de extractos bancarios.
 - Convertidor de tarjetas de crédito.
+- Teléfonos internacionales validados y normalizados con `phonelib`, con selector de país y Argentina como opción predeterminada.
 - Procesamiento local: los archivos elegidos en los convertidores no se suben al servidor.
 
 ## Puesta en marcha
@@ -39,7 +40,7 @@ El seed crea un acceso inicial para desarrollo:
 Para elegir credenciales propias al inicializar:
 
 ```bash
-CONTAR_ADMIN_EMAIL=admin@tuestudio.com CONTAR_ADMIN_PASSWORD='una-clave-segura' bin/rails db:seed
+CONTAR_ADMIN_EMAIL=admin@tuestudio.com CONTAR_ADMIN_PASSWORD='una-clave-segura' CONTAR_ADMIN_PHONE_COUNTRY='AR' CONTAR_ADMIN_PHONE='3515559999' bin/rails db:seed
 ```
 
 Cambiar la contraseña inicial antes de usar la aplicación con datos reales.
@@ -62,6 +63,9 @@ El repositorio incluye `render.yaml` y `bin/render-build.sh`. El Blueprint crea 
 4. Completar `DATABASE_URL` con la cadena de conexión entregada por Neon.
 5. Completar `RAILS_MASTER_KEY` con el contenido local de `config/master.key`.
 6. Elegir un correo y una contraseña segura para `CONTAR_ADMIN_EMAIL` y `CONTAR_ADMIN_PASSWORD`.
-7. Revisar y aprobar el Blueprint.
+7. Completar `CONTAR_ADMIN_PHONE_COUNTRY` con el código ISO del país y `CONTAR_ADMIN_PHONE` con el número nacional. Para Argentina: `AR` y el número sin `0`, `15` ni `+54 9` (por ejemplo, `3515559999`).
+8. Revisar y aprobar el Blueprint.
+
+El build ejecuta migraciones y seeds en cada despliegue. Los seeds son idempotentes: crean el administrador si falta, pero no reemplazan su contraseña si ya existe. Si agregaste las variables a un servicio existente, guardalas en Render y dispará un nuevo despliegue.
 
 Los secretos nunca deben agregarse al repositorio. Los próximos commits sobre `main` dispararán despliegues automáticos.

@@ -20,6 +20,12 @@ module Admin
         assign_converters
       end
 
+      flash[:created_user_access] = {
+        "name" => @user.name,
+        "email" => @user.email,
+        "phone" => @user.phone,
+        "password" => account_params[:password]
+      }
       redirect_to admin_users_path, notice: "Usuario creado correctamente."
     rescue ActiveRecord::RecordInvalid
       render :new, status: :unprocessable_entity
@@ -69,7 +75,7 @@ module Admin
       return @account_params if defined?(@account_params)
 
       submitted = params.require(:user)
-      attributes = submitted.permit(:name, :email, :password, :password_confirmation)
+      attributes = submitted.permit(:name, :email, :phone_country, :phone, :password, :password_confirmation)
       attributes[:role] = submitted[:role] if User.roles.key?(submitted[:role])
       attributes[:active] = ActiveModel::Type::Boolean.new.cast(submitted[:active]) if submitted.key?(:active)
       attributes = attributes.except(:password, :password_confirmation) if attributes[:password].blank?

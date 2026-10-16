@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_16_021313) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_16_021315) do
   create_table "converter_assignments", force: :cascade do |t|
     t.integer "user_id", null: false
     t.integer "converter_id", null: false
@@ -41,6 +41,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_16_021313) do
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "phone", null: false
+    t.string "phone_country", default: "AR", null: false
     t.index "lower(email)", name: "index_users_on_lower_email", unique: true
   end
 

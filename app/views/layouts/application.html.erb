@@ -38,7 +38,9 @@
 
     <main class="<%= current_user ? 'shell' : 'auth-shell' %>">
       <% flash.each do |type, message| %>
-        <div class="flash <%= type %>" role="status"><%= message %></div>
+        <% if message.is_a?(String) %>
+          <div class="flash <%= type %>" role="status"><%= message %></div>
+        <% end %>
       <% end %>
       <%= yield %>
     </main>
