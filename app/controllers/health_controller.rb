@@ -1,0 +1,10 @@
+class HealthController < ApplicationController
+  skip_before_action :require_authentication
+
+  def show
+    ActiveRecord::Base.connection.select_value("SELECT 1")
+    render plain: "ok"
+  rescue ActiveRecord::ActiveRecordError
+    render plain: "database unavailable", status: :service_unavailable
+  end
+end

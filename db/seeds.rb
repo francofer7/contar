@@ -22,8 +22,13 @@ converters.each do |attributes|
   converter.update!(attributes)
 end
 
-admin_email = ENV.fetch("CONTAR_ADMIN_EMAIL", "admin@contar.local")
-admin_password = ENV.fetch("CONTAR_ADMIN_PASSWORD", "Cambiar123!")
+if Rails.env.production?
+  admin_email = ENV.fetch("CONTAR_ADMIN_EMAIL")
+  admin_password = ENV.fetch("CONTAR_ADMIN_PASSWORD")
+else
+  admin_email = ENV.fetch("CONTAR_ADMIN_EMAIL", "admin@contar.local")
+  admin_password = ENV.fetch("CONTAR_ADMIN_PASSWORD", "Cambiar123!")
+end
 admin = User.find_or_initialize_by(email: admin_email)
 admin.assign_attributes(name: "Administrador", role: :admin, active: true)
 admin.password = admin_password if admin.new_record?
@@ -31,4 +36,4 @@ admin.password_confirmation = admin_password if admin.new_record?
 admin.save!
 
 puts "Contar listo. Administrador: #{admin.email}"
-puts "Contraseña inicial: #{admin_password}" if ENV["CONTAR_ADMIN_PASSWORD"].blank?
+puts "Contraseña inicial: #{admin_password}" if !Rails.env.production? && ENV["CONTAR_ADMIN_PASSWORD"].blank?
