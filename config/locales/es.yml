@@ -1,0 +1,28 @@
+es:
+  date:
+    day_names: [domingo, lunes, martes, miércoles, jueves, viernes, sábado]
+    month_names: [~, enero, febrero, marzo, abril, mayo, junio, julio, agosto, septiembre, octubre, noviembre, diciembre]
+    formats:
+      long: "%A, %-d de %B"
+  activerecord:
+    models:
+      user: Usuario
+    attributes:
+      user:
+        name: Nombre
+        email: Correo electrónico
+        password: Contraseña
+        password_confirmation: Confirmación de contraseña
+        role: Rol
+        active: Estado
+    errors:
+      messages:
+        record_invalid: "La validación falló: %{errors}"
+  errors:
+    format: "%{attribute}: %{message}"
+    messages:
+      blank: "no puede quedar vacío"
+      taken: "ya está en uso"
+      invalid: "no tiene un formato válido"
+      too_short: "debe tener al menos %{count} caracteres"
+      confirmation: "no coincide"

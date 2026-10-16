@@ -1,0 +1,43 @@
+<section class="page-heading compact">
+  <div>
+    <%= link_to "← Volver a usuarios", admin_users_path, class: "back-link" %>
+    <h1><%= heading %></h1>
+    <p><%= subheading %></p>
+  </div>
+</section>
+
+<%= form_with model: [:admin, @user], class: "user-form" do |form| %>
+  <% if @user.errors.any? %>
+    <div class="error-box" role="alert">
+      <strong>No pudimos guardar el usuario:</strong>
+      <ul><% @user.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+    </div>
+  <% end %>
+
+  <section class="form-card">
+    <div class="section-title"><span>01</span><div><h2>Datos de acceso</h2><p>Información básica para identificar e ingresar.</p></div></div>
+    <div class="form-grid">
+      <div class="field"><%= form.label :name, "Nombre completo" %><%= form.text_field :name, required: true, autocomplete: "name" %></div>
+      <div class="field"><%= form.label :email, "Correo electrónico" %><%= form.email_field :email, required: true, autocomplete: "email" %></div>
+      <div class="field"><%= form.label :password, @user.persisted? ? "Nueva contraseña" : "Contraseña" %><%= form.password_field :password, required: !@user.persisted?, autocomplete: "new-password", minlength: 8 %><small><%= @user.persisted? ? "Dejala vacía para conservar la actual." : "Mínimo 8 caracteres." %></small></div>
+      <div class="field"><%= form.label :password_confirmation, "Confirmar contraseña" %><%= form.password_field :password_confirmation, required: !@user.persisted?, autocomplete: "new-password", minlength: 8 %></div>
+    </div>
+  </section>
+
+  <section class="form-card">
+    <div class="section-title"><span>02</span><div><h2>Rol y permisos</h2><p>El administrador siempre accede a todas las herramientas.</p></div></div>
+    <div class="role-options">
+      <label class="choice-card"><%= form.radio_button :role, "operator" %><span><strong>Operario</strong><small>Accede únicamente a las herramientas asignadas.</small></span></label>
+      <label class="choice-card"><%= form.radio_button :role, "admin" %><span><strong>Administrador</strong><small>Gestiona usuarios y accede a todas las herramientas.</small></span></label>
+    </div>
+    <div class="assignment-list">
+      <p class="field-label">Herramientas asignadas</p>
+      <%= form.collection_check_boxes :converter_ids, @converters, :id, :name do |box| %>
+        <label class="tool-check"><%= box.check_box %><span><strong><%= box.text %></strong><small><%= box.object.description %></small></span></label>
+      <% end %>
+    </div>
+    <label class="active-check"><%= form.check_box :active %><span><strong>Usuario activo</strong><small>Si lo desactivás, no podrá iniciar sesión.</small></span></label>
+  </section>
+
+  <div class="form-actions"><%= link_to "Cancelar", admin_users_path, class: "button ghost" %><%= form.submit @user.persisted? ? "Guardar cambios" : "Crear usuario", class: "button primary" %></div>
+<% end %>

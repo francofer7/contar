@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extractor de Resúmenes de Tarjeta</title>
+<script src="/converter-assets/pdf.min.js"></script>
+<script src="/converter-assets/pdf.worker.min.js"></script>
+<script src="/converter-assets/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --tinta:#2b2620; --tinta-suave:#6b6255; --papel:#faf7f2; --papel-panel:#ffffff;
+    --linea:#e4ddd0; --acento:#8a5a3b; --acento-suave:#c9a37e;
+    --verde:#5c6e4f; --verde-fondo:#eef1e8;
+    --rojo:#a1503a; --rojo-fondo:#f7ece7;
+    --ambar:#a3792f; --ambar-fondo:#faf3e2;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{background:var(--papel);}
+  body{
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+    background:var(--papel); color:var(--tinta); padding:0 24px 80px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .contenedor{max-width:1180px; margin:0 auto;}
+
+  header{padding:44px 4px 40px; border-bottom:1px solid var(--linea); margin-bottom:44px;}
+  .volver{
+    display:inline-block; margin-bottom:24px; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--tinta-suave); text-decoration:none; font-family:-apple-system,'Segoe UI',sans-serif;
+    border-bottom:1px solid transparent; padding-bottom:2px; transition:color .15s,border-color .15s;
+  }
+  .volver:hover{color:var(--acento); border-bottom-color:var(--acento);}
+  header .marca{font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:var(--acento); margin-bottom:18px; font-family:Georgia,serif;}
+  header h1{font-size:clamp(30px,4vw,44px); font-weight:400; letter-spacing:-.01em; line-height:1.15; max-width:760px;}
+  header p{color:var(--tinta-suave); font-size:15px; margin-top:16px; max-width:600px; font-family:-apple-system,'Segoe UI',sans-serif;}
+
+  .panel{background:var(--papel-panel); border:1px solid var(--linea); padding:32px; margin-bottom:28px;}
+  .rotulo-seccion{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--tinta-suave); margin-bottom:20px; font-family:-apple-system,'Segoe UI',sans-serif;}
+
+  .controles{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;}
+  .campo label{display:block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:9px; color:var(--tinta-suave); font-family:-apple-system,'Segoe UI',sans-serif;}
+  select{
+    padding:11px 14px; border:1px solid var(--linea); border-radius:0; font-size:14.5px; min-width:300px;
+    background:var(--papel); color:var(--tinta); font-family:-apple-system,'Segoe UI',sans-serif;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6255' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center;
+  }
+  select:focus{outline:none; border-color:var(--acento);}
+
+  .dropzone{border:1px dashed var(--acento-suave); padding:46px 34px; text-align:center; cursor:pointer; transition:background .15s,border-color .15s; margin-top:26px;}
+  .dropzone:hover, .dropzone.arrastrando{background:var(--verde-fondo); border-color:var(--acento);}
+  .dropzone .icono{font-size:28px; opacity:.7;}
+  .dropzone p{margin-top:12px; font-size:15px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .dropzone small{color:var(--tinta-suave); font-size:12.5px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  #inputArchivos{display:none;}
+
+  .chips{display:flex; gap:1px; flex-wrap:wrap; margin-bottom:28px; background:var(--linea); border:1px solid var(--linea);}
+  .chip{background:var(--papel-panel); padding:20px 26px; min-width:170px; flex:1;}
+  .chip .valor{font-size:26px; font-weight:400; letter-spacing:-.01em;}
+  .chip .etiqueta{font-size:10.5px; color:var(--tinta-suave); text-transform:uppercase; letter-spacing:.14em; margin-top:6px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .chip.cons .valor{color:var(--acento);}
+  .chip.gast .valor{color:var(--rojo);}
+
+  .validacion{margin-bottom:28px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .val-item{display:flex; gap:10px; align-items:flex-start; padding:10px 16px; font-size:13px; margin-bottom:1px; border-left:2px solid transparent;}
+  .val-ok{background:var(--verde-fondo); color:#3d4a33; border-left-color:var(--verde);}
+  .val-error{background:var(--rojo-fondo); color:#7a3626; border-left-color:var(--rojo);}
+  .val-aviso{background:var(--ambar-fondo); color:#6e4f1a; border-left-color:var(--ambar);}
+
+  .acciones{display:flex; gap:14px; align-items:center; margin-bottom:24px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  button.descargar{
+    background:var(--tinta); color:var(--papel); border:none; border-radius:0; padding:14px 30px;
+    font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:500; cursor:pointer; transition:background .15s;
+  }
+  button.descargar:hover{background:var(--acento);}
+  button.descargar:disabled{background:#c9c2b5; cursor:not-allowed;}
+  button.limpiar{
+    background:transparent; color:var(--tinta-suave); border:1px solid var(--linea); border-radius:0;
+    padding:13px 20px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; transition:border-color .15s,color .15s;
+  }
+  button.limpiar:hover{border-color:var(--rojo); color:var(--rojo);}
+
+  .tabla-marco{overflow:auto; max-height:560px; border:1px solid var(--linea);}
+  table{border-collapse:collapse; width:100%; font-size:13px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  thead th{
+    position:sticky; top:0; background:var(--tinta); color:var(--papel); padding:12px 14px;
+    text-align:left; font-weight:500; white-space:nowrap; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  tbody td{padding:10px 14px; border-bottom:1px solid var(--linea); vertical-align:top;}
+  tbody tr:hover{background:#f4f0e8;}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  tr.fila-error td{background:var(--rojo-fondo) !important;}
+  .detalle-celda{max-width:520px; color:var(--tinta-suave);}
+  .tipo{
+    display:inline-block; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase;
+    padding:3px 9px; border:1px solid var(--linea); white-space:nowrap;
+  }
+  .tipo-consumo{color:var(--acento); border-color:var(--acento-suave); background:#fbf5ef;}
+  .tipo-gasto{color:var(--rojo); border-color:#e2c3b8; background:var(--rojo-fondo);}
+  .estado-proceso{font-size:13px; color:var(--acento); padding:10px 2px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .oculto{display:none;}
+  footer{
+    font-size:12px; color:var(--tinta-suave); margin-top:8px; line-height:1.7; padding:28px 4px 0;
+    border-top:1px solid var(--linea); font-family:-apple-system,'Segoe UI',sans-serif;
+  }
+  footer strong{color:var(--tinta); font-weight:600;}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header>
+    <a class="volver" href="/">← Contar</a>
+    <div class="marca">Tarjetas de Crédito · Argentina</div>
+    <h1>Extractor de resúmenes de tarjeta</h1>
+    <p>Cargá el resumen de tu tarjeta en PDF y obtené cada movimiento indicando si es un <strong>consumo</strong> en comercio o un <strong>gasto</strong> del banco. Todo se procesa en tu computadora.</p>
+  </header>
+
+  <div class="panel">
+    <div class="rotulo-seccion">Paso 1 — Origen</div>
+    <div class="controles">
+      <div class="campo">
+        <label for="selModelo">Modelo de resumen</label>
+        <select id="selModelo">
+          <option value="auto">Detección automática</option>
+          <option value="galicia">Galicia — Visa Business</option>
+          <option value="" disabled>Otros modelos — pendientes de calibración</option>
+        </select>
+      </div>
+    </div>
+    <div class="dropzone" id="zona">
+      <div class="icono">✳</div>
+      <p><strong>Arrastrá acá tus resúmenes de tarjeta</strong> o hacé clic para elegirlos</p>
+      <small>PDF — podés cargar varios a la vez</small>
+    </div>
+    <input type="file" id="inputArchivos" multiple accept=".pdf">
+    <div class="estado-proceso oculto" id="estado"></div>
+  </div>
+
+  <div id="resultados" class="oculto">
+    <div class="chips" id="chips"></div>
+    <div class="panel validacion" id="panelValidacion"></div>
+    <div class="panel">
+      <div class="rotulo-seccion">Paso 2 — Resultado</div>
+      <div class="acciones">
+        <button class="descargar" id="btnDescargar">Descargar Excel</button>
+        <button class="limpiar" id="btnLimpiar">Limpiar todo</button>
+        <span id="notaFilas" style="font-size:12px;color:var(--tinta-suave);font-family:-apple-system,'Segoe UI',sans-serif;"></span>
+      </div>
+      <div class="tabla-marco">
+        <table id="tabla">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <strong>Cómo se clasifica —</strong> <em>Consumo</em> son las compras en comercios (las filas agrupadas bajo cada tarjeta en "DETALLE DEL CONSUMO");
+    <em>Gasto</em> son los cargos del banco que figuran después del último subtotal por tarjeta (sellos, comisiones, IVA y percepciones).
+    La distinción sale de la estructura del propio resumen, no de adivinar por palabras clave.
+    <br><br>
+    <strong>Validación —</strong> se controla que los consumos de cada tarjeta sumen exactamente su subtotal declarado, y que
+    saldo anterior + pago + consumos + gastos dé el TOTAL A PAGAR del resumen. Si algo no coincide, se marca en rojo — nunca se inventan ni completan datos.
+    El saldo anterior y el pago no se exportan (no son movimientos del período), pero se usan para validar.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Utilidades (mismas convenciones que el módulo de extracto bancario)
+   ============================================================ */
+const NUM_RE_SRC = '-?\\d{1,3}(?:\\.\\d{3})*,\\d{2}|-?\\d+,\\d{2}';
+const NUM_EXACT_RE = new RegExp('^(?:' + NUM_RE_SRC + ')$');
+
+function parseNum(s){
+  s = String(s).replace(/\$/g,'').replace(/\s/g,'');
+  const neg = s.indexOf('-') !== -1;
+  s = s.replace(/-/g,'').replace(/\./g,'').replace(',', '.');
+  const v = parseFloat(s);
+  return neg ? -v : v;
+}
+function aCentavos(v){ return Math.round(v * 100); }
+function igualCent(a, b){ return Math.abs(aCentavos(a) - aCentavos(b)) <= 1; }
+const fmtAR = new Intl.NumberFormat('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+function fmt(v){ return v === null || v === undefined || v === '' ? '' : fmtAR.format(v); }
+function sinAcentos(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function escaparHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   Extracción de líneas del PDF CONSERVANDO POSICIONES X
+   A diferencia del módulo bancario, acá la posición X es esencial:
+   el resumen tiene dos columnas de importe (PESOS y DÓLARES) y además
+   algunas descripciones traen números embebidos (la base del IVA), que
+   sólo se distinguen del importe real por dónde están impresos.
+   ============================================================ */
+if (window.pdfjsLib && window.pdfjsWorker) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+}
+
+async function pdfALineasPos(datos){
+  const doc = await pdfjsLib.getDocument({data: datos}).promise;
+  const lineas = [];       // [{texto, items:[{x0,x1,str}]}]
+  let textoCompleto = '';
+  for (let p = 1; p <= doc.numPages; p++){
+    const pagina = await doc.getPage(p);
+    const tc = await pagina.getTextContent();
+    const filas = [];
+    for (const it of tc.items){
+      if (!it.str || !it.str.trim()) continue;
+      textoCompleto += it.str + ' ';
+      const t = it.transform;
+      if (Math.abs(t[1]) > 0.01 || Math.abs(t[2]) > 0.01) continue; // texto rotado
+      const y = t[5];
+      let fila = null;
+      for (const f of filas){ if (Math.abs(f.y - y) <= 2.5){ fila = f; break; } }
+      if (!fila){ fila = {y: y, items: []}; filas.push(fila); }
+      fila.items.push({x0: t[4], x1: t[4] + (it.width || 0), str: it.str});
+    }
+    filas.sort((a,b) => b.y - a.y);
+    for (const f of filas){
+      f.items.sort((a,b) => a.x0 - b.x0);
+      // separar los ítems en "palabras" para poder ubicar cada número por su X
+      const palabras = [];
+      for (const it of f.items){
+        const partes = it.str.split(/\s+/).filter(s => s.length);
+        if (partes.length <= 1){
+          if (it.str.trim()) palabras.push({x0: it.x0, x1: it.x1, str: it.str.trim()});
+          continue;
+        }
+        // repartir el ancho proporcionalmente entre las palabras del ítem
+        const ancho = it.x1 - it.x0;
+        const largoTotal = it.str.length || 1;
+        let cursor = 0;
+        for (const parte of partes){
+          const desde = it.str.indexOf(parte, cursor);
+          const x0 = it.x0 + (desde / largoTotal) * ancho;
+          const x1 = it.x0 + ((desde + parte.length) / largoTotal) * ancho;
+          palabras.push({x0: x0, x1: x1, str: parte});
+          cursor = desde + parte.length;
+        }
+      }
+      let texto = '';
+      let finPrevio = null;
+      for (const it of f.items){
+        if (finPrevio !== null && it.x0 - finPrevio > 1.2) texto += ' ';
+        texto += it.str;
+        finPrevio = it.x1;
+      }
+      texto = texto.replace(/\s+/g,' ').trim();
+      if (texto) lineas.push({texto: texto, items: palabras});
+    }
+    textoCompleto += '\n';
+  }
+  return {lineas: lineas, textoCompleto: textoCompleto};
+}
+
+/* ============================================================
+   Detección del modelo de resumen
+   ============================================================ */
+function detectarModelo(textoCompleto, lineas){
+  const t = sinAcentos(textoCompleto).toUpperCase();
+  const ls = sinAcentos(lineas.map(l => l.texto).join('\n')).toUpperCase();
+  // El encabezado de tabla + el subtotal por tarjeta son propios del resumen Galicia
+  if (/FECHA REFERENCIA CUOTA COMPROBANTE PESOS DOLARES/.test(ls)
+      && /DETALLE DEL CONSUMO/.test(ls)) return 'galicia';
+  if (/TARJETA \d+ TOTAL CONSUMOS DE/.test(ls) && t.indexOf('GALICIA') !== -1) return 'galicia';
+  return null;
+}
+
+const NOMBRES_MODELO = { galicia: 'Galicia — Visa Business' };
+
+/* ============================================================
+   Parser: RESUMEN DE TARJETA — BANCO GALICIA (Visa Business)
+   -------------------------------------------------------------
+   Estructura del resumen:
+     CONSOLIDADO PESOS DÓLARES
+     SALDO ANTERIOR <pesos> <dolares>
+     DD-MM-AA SU PAGO EN PESOS -<pesos>
+     DETALLE DEL CONSUMO
+     FECHA REFERENCIA CUOTA COMPROBANTE PESOS DÓLARES   <- se repite por página
+     DD-MM-AA * COMERCIO [cuota] [comprobante] <pesos> [dolares]   <- consumos
+     TARJETA NNNN Total Consumos de NOMBRE <pesos> <dolares>       <- cierra el grupo
+     ... (otro grupo de consumos + su TARJETA ...)
+     DD-MM-AA IMPUESTO DE SELLOS / COMISIÓN / IVA / PERCEP  <pesos> <- cargos del banco
+     TOTAL A PAGAR <pesos> <dolares>
+
+   Clasificación Consumo/Gasto (estructural, no por palabras clave):
+     los movimientos que quedan cerrados por una línea "TARJETA ... Total
+     Consumos" son CONSUMOS; los que quedan sin subtotal de tarjeta al llegar
+     a "TOTAL A PAGAR" son los cargos del banco = GASTOS.
+
+   Importes: se toman por POSICIÓN X según la columna del encabezado
+   (PESOS / DÓLARES). Así la base del IVA que viene embebida en la
+   descripción ("DB IVA $ RESP INSC. 21% 3.966,94 833,06") no se confunde
+   con el importe real: 3.966,94 está en la zona de texto, 833,06 en la
+   columna PESOS.
+   ============================================================ */
+function parseTarjetaGalicia(lineas){
+  const movs = [];
+  const avisos = [];
+  const grupos = [];              // {tarjeta, titular, subtotal, n, suma, ok}
+  let saldoAnterior = null, pago = null, totalPagar = null, totalPagarUsd = null;
+
+  // --- 1. ubicar las columnas de importe por el encabezado ---
+  let xPesos = null, xDolares = null;
+  for (const l of lineas){
+    const norm = sinAcentos(l.texto).toUpperCase();
+    // Sólo sirven los encabezados de tabla, que TERMINAN en "PESOS DÓLARES"
+    // ("CONSOLIDADO ..." y "FECHA REFERENCIA ..."). La línea de TASAS también
+    // menciona pesos y dólares ("En pesos 91,750% En dólares 20,000%...") pero
+    // en otras coordenadas: si se tomara esa, ningún importe caería en columna.
+    if (!/\bPESOS\s+DOLARES\s*$/.test(norm)) continue;
+    for (const it of l.items){
+      const s = sinAcentos(it.str).toUpperCase();
+      if (s === 'PESOS') xPesos = it.x1;
+      if (s === 'DOLARES') xDolares = it.x1;
+    }
+    if (xPesos !== null && xDolares !== null) break;
+  }
+  if (xPesos === null){
+    return {movs: [], avisos: ['No se encontró el encabezado de columnas (PESOS / DÓLARES) del resumen de tarjeta Galicia.'],
+            grupos: [], declarado: null};
+  }
+  const TOL = 18; // los importes vienen alineados a la derecha del título de su columna
+
+  // devuelve los importes de la línea separados por columna, y el x0 del primero
+  function montos(l, desdeIdx){
+    let pesos = null, dolares = null, x0Primero = null;
+    for (let i = desdeIdx || 0; i < l.items.length; i++){
+      const it = l.items[i];
+      if (!NUM_EXACT_RE.test(it.str)) continue;
+      let col = null;
+      if (Math.abs(it.x1 - xPesos) < TOL) col = 'p';
+      else if (xDolares !== null && Math.abs(it.x1 - xDolares) < TOL) col = 'd';
+      if (!col) continue; // número dentro de la descripción (ej. base del IVA)
+      if (col === 'p') pesos = parseNum(it.str); else dolares = parseNum(it.str);
+      if (x0Primero === null || it.x0 < x0Primero) x0Primero = it.x0;
+    }
+    return {pesos: pesos, dolares: dolares, x0: x0Primero};
+  }
+
+  // texto de la descripción: lo que está a la izquierda del primer importe de columna
+  function detalleDe(l, x0Corte){
+    const partes = [];
+    for (let i = 1; i < l.items.length; i++){
+      const it = l.items[i];
+      if (x0Corte !== null && it.x1 > x0Corte) continue;
+      partes.push(it.str);
+    }
+    return partes.join(' ').replace(/\s+/g,' ').trim();
+  }
+
+  // --- 2. recorrer el resumen ---
+  let estado = 'antes';
+  let pendientes = [];   // consumos del grupo (tarjeta) en curso
+
+  for (const l of lineas){
+    const texto = l.texto;
+    const norm = sinAcentos(texto).toUpperCase();
+
+    if (/^CONSOLIDADO\b/.test(norm)){ estado = 'consolidado'; continue; }
+    if (/^DETALLE DEL CONSUMO/.test(norm)){ estado = 'detalle'; continue; }
+    if (/^FECHA REFERENCIA/.test(norm)) continue;
+
+    if (estado === 'consolidado'){
+      if (/^SALDO ANTERIOR/.test(norm)){ saldoAnterior = montos(l).pesos; continue; }
+      if (norm.indexOf('SU PAGO') !== -1){
+        const m = montos(l, 1);
+        if (m.pesos !== null) pago = m.pesos;   // viene en negativo
+        continue;
+      }
+      continue;
+    }
+    if (estado !== 'detalle') continue;
+
+    // cierre de grupo por tarjeta
+    const mTar = texto.match(/^TARJETA\s+(\S+)\s+Total Consumos de\s+(.+?)\s+(?:-?[\d.]+,\d{2})/i);
+    if (mTar){
+      const m = montos(l);
+      const suma = pendientes.reduce((s, x) => s + (x.pesos || 0), 0);
+      const sumaUsd = pendientes.reduce((s, x) => s + (x.dolares || 0), 0);
+      const okPesos = m.pesos === null || igualCent(suma, m.pesos);
+      const okUsd = m.dolares === null || igualCent(sumaUsd, m.dolares);
+      grupos.push({tarjeta: mTar[1], titular: mTar[2].trim(), subtotal: m.pesos,
+                   subtotalUsd: m.dolares, n: pendientes.length, suma: suma, sumaUsd: sumaUsd,
+                   ok: okPesos && okUsd});
+      if (!okPesos)
+        for (const x of pendientes) x.error = true;
+      for (const x of pendientes){ x.tipo = 'Consumo'; movs.push(x); }
+      pendientes = [];
+      continue;
+    }
+
+    // total a pagar: lo que quedó sin subtotal de tarjeta son los cargos del banco
+    if (/^TOTAL A PAGAR/.test(norm)){
+      const m = montos(l);
+      totalPagar = m.pesos; totalPagarUsd = m.dolares;
+      for (const x of pendientes){ x.tipo = 'Gasto'; movs.push(x); }
+      pendientes = [];
+      break;
+    }
+
+    // fila de movimiento
+    const mFecha = texto.match(/^(\d{2}-\d{2}-\d{2})\s/);
+    if (!mFecha) continue;   // encabezados, textos legales, pies: se descartan
+    const m = montos(l, 1);
+    if (m.pesos === null && m.dolares === null){
+      avisos.push('Línea con fecha sin importe en las columnas PESOS/DÓLARES: "' + texto + '"');
+      continue;
+    }
+    pendientes.push({
+      fecha: mFecha[1],
+      detalle: detalleDe(l, m.x0),
+      tipo: null,
+      pesos: m.pesos,
+      dolares: m.dolares,
+      error: false
+    });
+  }
+
+  if (pendientes.length > 0){
+    avisos.push(pendientes.length + ' movimiento(s) quedaron sin clasificar porque no se encontró la línea "TOTAL A PAGAR". Revisalos.');
+    for (const x of pendientes){ x.tipo = 'Sin clasificar'; x.error = true; movs.push(x); }
+  }
+  if (movs.length === 0) avisos.push('No se encontraron movimientos en el detalle del consumo.');
+
+  return {
+    movs: movs, avisos: avisos, grupos: grupos,
+    declarado: {saldoAnterior: saldoAnterior, pago: pago, totalPagar: totalPagar, totalPagarUsd: totalPagarUsd}
+  };
+}
+
+const PARSERS = { galicia: parseTarjetaGalicia };
+
+/* ============================================================
+   Validación: subtotales por tarjeta + reconciliación con el total
+   ============================================================ */
+function validarResultado(res){
+  const val = [];
+  const movs = res.movs;
+  const consumos = movs.filter(m => m.tipo === 'Consumo');
+  const gastos = movs.filter(m => m.tipo === 'Gasto');
+
+  // subtotal declarado por cada tarjeta
+  for (const g of res.grupos){
+    if (g.subtotal === null) continue;
+    if (g.ok)
+      val.push({tipo: 'ok', msj: 'Tarjeta ' + g.tarjeta + ' (' + g.titular + '): los ' + g.n +
+        ' consumos suman $ ' + fmt(g.suma) + ', igual al subtotal declarado por el banco.'});
+    else
+      val.push({tipo: 'error', msj: 'Tarjeta ' + g.tarjeta + ' (' + g.titular + '): los consumos suman $ ' +
+        fmt(g.suma) + ' pero el subtotal declarado es $ ' + fmt(g.subtotal) +
+        '. Diferencia: $ ' + fmt(g.suma - g.subtotal)});
+  }
+
+  // reconciliación global contra TOTAL A PAGAR
+  const d = res.declarado || {};
+  const sumaCons = consumos.reduce((s,m) => s + (m.pesos || 0), 0);
+  const sumaGast = gastos.reduce((s,m) => s + (m.pesos || 0), 0);
+  if (d.totalPagar !== null && d.totalPagar !== undefined){
+    const base = (d.saldoAnterior || 0) + (d.pago || 0);
+    const calc = base + sumaCons + sumaGast;
+    if (igualCent(calc, d.totalPagar))
+      val.push({tipo: 'ok', msj: 'Cierre exacto: saldo anterior $ ' + fmt(d.saldoAnterior || 0) +
+        ' + pago $ ' + fmt(d.pago || 0) + ' + consumos $ ' + fmt(sumaCons) + ' + gastos $ ' + fmt(sumaGast) +
+        ' = $ ' + fmt(d.totalPagar) + ', el TOTAL A PAGAR del resumen.'});
+    else
+      val.push({tipo: 'error', msj: 'La suma no cierra contra el TOTAL A PAGAR: calculado $ ' + fmt(calc) +
+        ' vs declarado $ ' + fmt(d.totalPagar) + '. Diferencia: $ ' + fmt(calc - d.totalPagar)});
+  } else {
+    val.push({tipo: 'aviso', msj: 'No se encontró la línea "TOTAL A PAGAR", así que no se pudo validar el cierre global.'});
+  }
+
+  if (movs.length > 0)
+    val.push({tipo: 'ok', msj: consumos.length + ' consumo(s) y ' + gastos.length +
+      ' gasto(s) extraídos del resumen.'});
+
+  for (const a of res.avisos) val.push({tipo: 'aviso', msj: a});
+  return val;
+}
+
+/* ============================================================
+   Estado y procesamiento
+   ============================================================ */
+const ESTADO = { archivos: [] };
+
+async function procesarArrayBuffer(nombre, arrayBuffer, modeloForzado){
+  const datos = new Uint8Array(arrayBuffer);
+  const {lineas, textoCompleto} = await pdfALineasPos(datos);
+  const detectado = detectarModelo(textoCompleto, lineas);
+  const modelo = (modeloForzado && modeloForzado !== 'auto') ? modeloForzado : detectado;
+  const avisosExtra = [];
+  if (!modelo){
+    return {nombre: nombre, modelo: null, res: {movs: [], grupos: [], declarado: null,
+      avisos: ['No pude identificar el modelo de resumen de "' + nombre + '". Por ahora sólo está calibrado el resumen de tarjeta de Banco Galicia (Visa Business); para agregar otro necesito un resumen real de ese banco.']}};
+  }
+  if (modeloForzado && modeloForzado !== 'auto' && detectado && detectado !== modeloForzado){
+    avisosExtra.push('Elegiste "' + NOMBRES_MODELO[modeloForzado] + '" pero el archivo no parece corresponder a ese modelo. Verificá el resultado.');
+  }
+  const res = PARSERS[modelo](lineas);
+  res.avisos = avisosExtra.concat(res.avisos);
+  return {nombre: nombre, modelo: modelo, res: res};
+}
+
+async function procesarArchivos(lista){
+  const modelo = document.getElementById('selModelo').value;
+  const estadoEl = document.getElementById('estado');
+  estadoEl.classList.remove('oculto');
+  for (const archivo of lista){
+    estadoEl.textContent = 'Procesando ' + archivo.name + '…';
+    try {
+      const buf = await archivo.arrayBuffer();
+      const r = await procesarArrayBuffer(archivo.name, buf, modelo);
+      r.validaciones = validarResultado(r.res);
+      ESTADO.archivos.push(r);
+    } catch (e){
+      ESTADO.archivos.push({nombre: archivo.name, modelo: null,
+        res: {movs: [], grupos: [], declarado: null, avisos: ['Error al procesar: ' + e.message]},
+        validaciones: [{tipo: 'error', msj: 'Error al procesar "' + archivo.name + '": ' + e.message}]});
+    }
+  }
+  estadoEl.classList.add('oculto');
+  render();
+}
+
+/* ============================================================
+   Render y exportación
+   ============================================================ */
+function todosLosMovs(){
+  const filas = [];
+  for (const a of ESTADO.archivos)
+    for (const m of a.res.movs)
+      filas.push({archivo: a.nombre, mov: m});
+  return filas;
+}
+
+function columnasSalida(){
+  const filas = todosLosMovs();
+  const variosArchivos = ESTADO.archivos.length > 1;
+  const hayDolares = filas.some(f => f.mov.dolares !== null && f.mov.dolares !== 0);
+  const cols = [];
+  if (variosArchivos) cols.push('Archivo');
+  cols.push('Fecha', 'Detalle', 'Tipo', 'Pesos');
+  if (hayDolares) cols.push('Dólares');
+  return {cols: cols, variosArchivos: variosArchivos, hayDolares: hayDolares};
+}
+
+const LIMITE_VISTA = 1000;
+
+function render(){
+  const cont = document.getElementById('resultados');
+  const filas = todosLosMovs();
+  if (ESTADO.archivos.length === 0){ cont.classList.add('oculto'); return; }
+  cont.classList.remove('oculto');
+
+  const consumos = filas.filter(f => f.mov.tipo === 'Consumo');
+  const gastos = filas.filter(f => f.mov.tipo === 'Gasto');
+  const sumaCons = consumos.reduce((s,f) => s + (f.mov.pesos || 0), 0);
+  const sumaGast = gastos.reduce((s,f) => s + (f.mov.pesos || 0), 0);
+  const conError = filas.filter(f => f.mov.error).length;
+
+  document.getElementById('chips').innerHTML =
+    '<div class="chip"><div class="valor">' + consumos.length + '</div><div class="etiqueta">Consumos</div></div>' +
+    '<div class="chip cons"><div class="valor">$ ' + fmt(sumaCons) + '</div><div class="etiqueta">Total consumos</div></div>' +
+    '<div class="chip gast"><div class="valor">$ ' + fmt(sumaGast) + '</div><div class="etiqueta">Total gastos (' + gastos.length + ')</div></div>' +
+    '<div class="chip"><div class="valor" style="color:' + (conError ? 'var(--rojo)' : 'var(--verde)') + '">' +
+      (conError ? conError + ' ⚠' : '✓') + '</div><div class="etiqueta">' + (conError ? 'Filas con error' : 'Validación') + '</div></div>';
+
+  let html = '';
+  for (const a of ESTADO.archivos){
+    html += '<div style="font-weight:600; font-size:13.5px; margin:8px 0 6px;">▪ ' + escaparHtml(a.nombre) +
+            (a.modelo ? ' — ' + (NOMBRES_MODELO[a.modelo] || a.modelo) : '') +
+            ' <span style="font-weight:400;color:var(--tinta-suave);">(' + a.res.movs.length + ' movimientos)</span></div>';
+    for (const v of a.validaciones){
+      const clase = v.tipo === 'ok' ? 'val-ok' : (v.tipo === 'error' ? 'val-error' : 'val-aviso');
+      const icono = v.tipo === 'ok' ? '✓' : (v.tipo === 'error' ? '✗' : '⚠');
+      html += '<div class="val-item ' + clase + '"><span>' + icono + '</span><span>' + escaparHtml(v.msj) + '</span></div>';
+    }
+  }
+  document.getElementById('panelValidacion').innerHTML = html;
+
+  const {cols, variosArchivos, hayDolares} = columnasSalida();
+  document.querySelector('#tabla thead').innerHTML =
+    '<tr>' + cols.map(c => '<th>' + escaparHtml(c) + '</th>').join('') + '</tr>';
+
+  const cuerpo = [];
+  for (const f of filas.slice(0, LIMITE_VISTA)){
+    const m = f.mov;
+    const celdas = [];
+    if (variosArchivos) celdas.push('<td>' + escaparHtml(f.archivo) + '</td>');
+    celdas.push('<td>' + escaparHtml(m.fecha) + '</td>');
+    celdas.push('<td class="detalle-celda">' + escaparHtml(m.detalle) + '</td>');
+    const claseTipo = m.tipo === 'Consumo' ? 'tipo-consumo' : (m.tipo === 'Gasto' ? 'tipo-gasto' : '');
+    celdas.push('<td><span class="tipo ' + claseTipo + '">' + escaparHtml(m.tipo || '') + '</span></td>');
+    celdas.push('<td class="num">' + (m.pesos !== null ? fmt(m.pesos) : '') + '</td>');
+    if (hayDolares) celdas.push('<td class="num">' + (m.dolares !== null ? fmt(m.dolares) : '') + '</td>');
+    cuerpo.push('<tr' + (m.error ? ' class="fila-error" title="Esta fila no cierra contra el subtotal declarado"' : '') + '>' + celdas.join('') + '</tr>');
+  }
+  document.querySelector('#tabla tbody').innerHTML = cuerpo.join('');
+  document.getElementById('notaFilas').textContent =
+    filas.length > LIMITE_VISTA
+      ? 'Mostrando ' + LIMITE_VISTA + ' de ' + filas.length + ' movimientos (el Excel incluye todos).'
+      : filas.length + ' movimiento(s) listos para exportar.';
+  document.getElementById('btnDescargar').disabled = filas.length === 0;
+}
+
+function descargarExcel(){
+  const filas = todosLosMovs();
+  if (filas.length === 0) return;
+  const {cols, variosArchivos, hayDolares} = columnasSalida();
+  const aoa = [cols];
+  for (const f of filas){
+    const m = f.mov;
+    const fila = [];
+    if (variosArchivos) fila.push(f.archivo);
+    fila.push(m.fecha, m.detalle, m.tipo || '', m.pesos !== null ? m.pesos : '');
+    if (hayDolares) fila.push(m.dolares !== null ? m.dolares : '');
+    aoa.push(fila);
+  }
+  // totales por tipo, tomados de lo extraído
+  const sumaCons = filas.filter(f => f.mov.tipo === 'Consumo').reduce((s,f) => s + (f.mov.pesos || 0), 0);
+  const sumaGast = filas.filter(f => f.mov.tipo === 'Gasto').reduce((s,f) => s + (f.mov.pesos || 0), 0);
+  const iPesos = cols.indexOf('Pesos');
+  const iDet = cols.indexOf('Detalle');
+  const filaVacia = new Array(cols.length).fill('');
+  aoa.push(filaVacia.slice());
+  const fc = filaVacia.slice(); fc[iDet] = 'TOTAL CONSUMOS'; fc[iPesos] = Math.round(sumaCons*100)/100; aoa.push(fc);
+  const fg = filaVacia.slice(); fg[iDet] = 'TOTAL GASTOS';   fg[iPesos] = Math.round(sumaGast*100)/100; aoa.push(fg);
+  const ft = filaVacia.slice(); ft[iDet] = 'TOTAL';          ft[iPesos] = Math.round((sumaCons+sumaGast)*100)/100; aoa.push(ft);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const idxNum = ['Pesos','Dólares'].map(n => cols.indexOf(n));
+  for (let r = 1; r < aoa.length; r++){
+    for (const c of idxNum){
+      if (c === -1) continue;
+      const ref = XLSX.utils.encode_cell({r: r, c: c});
+      if (ws[ref] && typeof ws[ref].v === 'number'){ ws[ref].t = 'n'; ws[ref].z = '#,##0.00'; }
+    }
+  }
+  const anchoDetalle = Math.min(70, Math.max(30, ...filas.map(f => f.mov.detalle.length)));
+  ws['!cols'] = cols.map(c => {
+    if (c === 'Detalle') return {wch: anchoDetalle};
+    if (c === 'Archivo') return {wch: 28};
+    if (c === 'Fecha') return {wch: 11};
+    if (c === 'Tipo') return {wch: 12};
+    return {wch: 16};
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Tarjeta');
+  XLSX.writeFile(wb, 'movimientos_tarjeta_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
+
+/* ============================================================
+   Eventos
+   ============================================================ */
+const zona = document.getElementById('zona');
+const inputArchivos = document.getElementById('inputArchivos');
+zona.addEventListener('click', () => inputArchivos.click());
+zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('arrastrando'); });
+zona.addEventListener('dragleave', () => zona.classList.remove('arrastrando'));
+zona.addEventListener('drop', e => {
+  e.preventDefault();
+  zona.classList.remove('arrastrando');
+  if (e.dataTransfer.files.length) procesarArchivos([...e.dataTransfer.files]);
+});
+inputArchivos.addEventListener('change', () => {
+  if (inputArchivos.files.length) procesarArchivos([...inputArchivos.files]);
+  inputArchivos.value = '';
+});
+document.getElementById('btnDescargar').addEventListener('click', descargarExcel);
+document.getElementById('btnLimpiar').addEventListener('click', () => { ESTADO.archivos = []; render(); });
+
+/* API interna para verificación automatizada */
+window.__APP__ = {
+  procesarArrayBuffer: procesarArrayBuffer,
+  validarResultado: validarResultado,
+  estado: ESTADO,
+  async testConUrl(url, modelo){
+    const r = await fetch(url);
+    const buf = await r.arrayBuffer();
+    const res = await procesarArrayBuffer(decodeURIComponent(url.split('/').pop()), buf, modelo || 'auto');
+    res.validaciones = validarResultado(res.res);
+    return res;
+  }
+};
+</script>
+</body>
+</html>

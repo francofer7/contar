@@ -1,0 +1,41 @@
+<% content_for :title, "Herramientas · Contar" %>
+
+<section class="page-heading dashboard-heading">
+  <div>
+    <p class="eyebrow"><%= l(Date.current, format: :long) %></p>
+    <h1>Buen día, <%= current_user.name.split.first %>.</h1>
+    <p>Estas son las herramientas disponibles para tu usuario.</p>
+  </div>
+  <% if current_user.admin? %>
+    <%= link_to "Administrar usuarios", admin_users_path, class: "button secondary" %>
+  <% end %>
+</section>
+
+<% if @converters.any? %>
+  <section class="tool-grid" aria-label="Convertidores disponibles">
+    <% @converters.each_with_index do |converter, index| %>
+      <%= link_to converter_path(converter.key), class: "tool-card", data: { turbo: false } do %>
+        <div class="tool-card-top">
+          <span class="tool-number"><%= format("%02d", index + 1) %></span>
+          <span class="arrow" aria-hidden="true">↗</span>
+        </div>
+        <div class="tool-icon"><%= converter.key == "extractos-bancarios" ? "≋" : "◫" %></div>
+        <h2><%= converter.name %></h2>
+        <p><%= converter.description %></p>
+        <span class="tool-action">Abrir convertidor</span>
+      <% end %>
+    <% end %>
+  </section>
+<% else %>
+  <section class="empty-state">
+    <span>○</span>
+    <h2>Todavía no tenés herramientas asignadas</h2>
+    <p>Pedile a un administrador que habilite al menos un convertidor para tu usuario.</p>
+  </section>
+<% end %>
+
+<section class="trust-strip">
+  <div><strong>Procesamiento local</strong><span>Los archivos no salen de tu computadora.</span></div>
+  <div><strong>Formatos calibrados</strong><span>Cada banco se valida contra extractos reales.</span></div>
+  <div><strong>Exportación limpia</strong><span>Resultados listos para trabajar en Excel.</span></div>
+</section>

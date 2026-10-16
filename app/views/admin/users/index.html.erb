@@ -1,0 +1,34 @@
+<% content_for :title, "Usuarios · Contar" %>
+
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Administración</p>
+    <h1>Usuarios y accesos</h1>
+    <p>Creá el equipo y definí qué convertidores puede usar cada operario.</p>
+  </div>
+  <%= link_to "+ Nuevo usuario", new_admin_user_path, class: "button primary" %>
+</section>
+
+<section class="table-card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Usuario</th><th>Rol</th><th>Herramientas</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        <% @users.each do |user| %>
+          <tr>
+            <td><div class="user-cell"><span class="avatar"><%= initials(user.name) %></span><div><strong><%= user.name %></strong><small><%= user.email %></small></div></div></td>
+            <td><span class="role-badge <%= user.role %>"><%= role_label(user) %></span></td>
+            <td class="muted"><%= user.admin? ? "Todas" : (user.assigned_converters.map(&:name).join(", ").presence || "Sin asignar") %></td>
+            <td><span class="status <%= user.active? ? 'on' : 'off' %>"><%= user.active? ? "Activo" : "Inactivo" %></span></td>
+            <td class="actions">
+              <%= link_to "Editar", edit_admin_user_path(user), class: "text-link" %>
+              <% unless user == current_user %>
+                <%= button_to "Eliminar", admin_user_path(user), method: :delete, class: "danger-link", form: { data: { turbo_confirm: "¿Eliminar a #{user.name}?" } } %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</section>

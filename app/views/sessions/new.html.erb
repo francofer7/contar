@@ -1,0 +1,28 @@
+<% content_for :title, "Ingresar · Contar" %>
+
+<section class="login-card">
+  <div class="login-brand">
+    <span class="brand-mark large">C</span>
+    <div><strong>contar</strong><small>gestión para estudios contables</small></div>
+  </div>
+
+  <div class="login-heading">
+    <p class="eyebrow">Acceso al estudio</p>
+    <h1>Bienvenido</h1>
+    <p>Ingresá con los datos que te asignó el administrador.</p>
+  </div>
+
+  <%= form_with url: login_path, class: "stack-form" do |form| %>
+    <div class="field">
+      <%= form.label :email, "Correo electrónico" %>
+      <%= form.email_field :email, value: params[:email], required: true, autofocus: true, autocomplete: "email", placeholder: "nombre@estudio.com" %>
+    </div>
+    <div class="field">
+      <%= form.label :password, "Contraseña" %>
+      <%= form.password_field :password, required: true, autocomplete: "current-password", placeholder: "••••••••" %>
+    </div>
+    <%= form.submit "Ingresar a Contar", class: "button primary full" %>
+  <% end %>
+
+  <p class="privacy-note">Tus extractos se procesan localmente en el navegador y no se guardan en el servidor.</p>
+</section>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <title><%= content_for(:title) || "Contar" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#173b34">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="<%= current_user ? 'app-body' : 'auth-body' %>">
+    <% if current_user %>
+      <header class="topbar">
+        <%= link_to root_path, class: "brand" do %>
+          <span class="brand-mark">C</span>
+          <span>contar<small>estudio digital</small></span>
+        <% end %>
+        <nav class="topnav" aria-label="Navegación principal">
+          <%= link_to "Herramientas", root_path, class: ("active" if controller_name == "dashboard") %>
+          <% if current_user.admin? %>
+            <%= link_to "Usuarios", admin_users_path, class: ("active" if controller_path == "admin/users") %>
+          <% end %>
+        </nav>
+        <div class="account-menu">
+          <span class="avatar"><%= initials(current_user.name) %></span>
+          <span class="account-copy"><strong><%= current_user.name %></strong><small><%= role_label(current_user) %></small></span>
+          <%= button_to "Salir", logout_path, method: :delete, class: "link-button" %>
+        </div>
+      </header>
+    <% end %>
+
+    <main class="<%= current_user ? 'shell' : 'auth-shell' %>">
+      <% flash.each do |type, message| %>
+        <div class="flash <%= type %>" role="status"><%= message %></div>
+      <% end %>
+      <%= yield %>
+    </main>
+  </body>
+</html>

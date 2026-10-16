@@ -1,0 +1,22 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+admin:
+  name: Ada Administradora
+  email: admin@example.com
+  password_digest: <%= BCrypt::Password.create("password123") %>
+  role: 1
+  active: true
+
+operator:
+  name: Oscar Operario
+  email: operator@example.com
+  password_digest: <%= BCrypt::Password.create("password123") %>
+  role: 0
+  active: true
+
+inactive:
+  name: Inés Inactiva
+  email: inactive@example.com
+  password_digest: <%= BCrypt::Password.create("password123") %>
+  role: 0
+  active: false

@@ -1,0 +1,18 @@
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  connect_timeout: 5
+
+development:
+  <<: *default
+  database: <%= ENV.fetch("CONTAR_DATABASE_NAME", "contar_development") %>
+
+test:
+  <<: *default
+  database: contar_test
+
+# Rails combina esta configuración con DATABASE_URL cuando está presente.
+production:
+  <<: *default
+  database: contar_production

@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+banking:
+  key: extractos-bancarios
+  name: Extractos bancarios
+  description: Convierte extractos bancarios.
+  source_file: banking.html
+  position: 1
+  active: true
+
+cards:
+  key: tarjetas-credito
+  name: Tarjetas de crédito
+  description: Convierte resúmenes de tarjeta.
+  source_file: cards.html
+  position: 2
+  active: true

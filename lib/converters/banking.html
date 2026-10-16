@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Extractor de Movimientos Bancarios</title>
+<script src="/converter-assets/pdf.min.js"></script>
+<script src="/converter-assets/pdf.worker.min.js"></script>
+<script src="/converter-assets/xlsx.full.min.js"></script>
+<style>
+  @font-face{
+    font-family:'Fraunces-fallback'; size-adjust:100%; src:local('Georgia');
+  }
+  :root{
+    --tinta:#2b2620; --tinta-suave:#6b6255; --papel:#faf7f2; --papel-panel:#ffffff;
+    --linea:#e4ddd0; --acento:#8a5a3b; --acento-suave:#c9a37e;
+    --verde:#5c6e4f; --verde-fondo:#eef1e8;
+    --rojo:#a1503a; --rojo-fondo:#f7ece7;
+    --ambar:#a3792f; --ambar-fondo:#faf3e2;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{background:var(--papel);}
+  body{
+    font-family:'Iowan Old Style','Palatino Linotype',Palatino,Georgia,'Times New Roman',serif;
+    background:var(--papel); color:var(--tinta); padding:0 24px 80px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .contenedor{max-width:1180px; margin:0 auto;}
+
+  header{padding:44px 4px 40px; border-bottom:1px solid var(--linea); margin-bottom:44px;}
+  .volver{
+    display:inline-block; margin-bottom:24px; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--tinta-suave); text-decoration:none; font-family:-apple-system,'Segoe UI',sans-serif;
+    border-bottom:1px solid transparent; padding-bottom:2px; transition:color .15s,border-color .15s;
+  }
+  .volver:hover{color:var(--acento); border-bottom-color:var(--acento);}
+  header .marca{font-size:11px; letter-spacing:.28em; text-transform:uppercase; color:var(--acento); margin-bottom:18px; font-family:Georgia,serif;}
+  header h1{
+    font-size:clamp(30px,4vw,44px); font-weight:400; letter-spacing:-.01em;
+    line-height:1.15; max-width:760px;
+  }
+  header p{color:var(--tinta-suave); font-size:15px; margin-top:16px; max-width:560px; font-family:-apple-system,'Segoe UI',sans-serif;}
+
+  .panel{background:var(--papel-panel); border:1px solid var(--linea); padding:32px; margin-bottom:28px;}
+  .rotulo-seccion{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--tinta-suave); margin-bottom:20px; font-family:-apple-system,'Segoe UI',sans-serif;}
+
+  .controles{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;}
+  .campo label{display:block; font-size:11px; letter-spacing:.06em; text-transform:uppercase; margin-bottom:9px; color:var(--tinta-suave); font-family:-apple-system,'Segoe UI',sans-serif;}
+  select{
+    padding:11px 14px; border:1px solid var(--linea); border-radius:0; font-size:14.5px; min-width:280px;
+    background:var(--papel); color:var(--tinta); font-family:-apple-system,'Segoe UI',sans-serif;
+    appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b6255' stroke-width='1.4' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 14px center;
+  }
+  select:focus{outline:none; border-color:var(--acento);}
+  .nota-banco{font-size:12.5px; color:var(--ambar); background:var(--ambar-fondo); border:1px solid #ecdcb6; padding:10px 14px; margin-top:14px; display:none; font-family:-apple-system,'Segoe UI',sans-serif;}
+
+  .dropzone{border:1px dashed var(--acento-suave); padding:46px 34px; text-align:center; cursor:pointer; transition:background .15s,border-color .15s; margin-top:26px;}
+  .dropzone:hover, .dropzone.arrastrando{background:var(--verde-fondo); border-color:var(--acento);}
+  .dropzone .icono{font-size:28px; opacity:.7;}
+  .dropzone p{margin-top:12px; font-size:15px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .dropzone small{color:var(--tinta-suave); font-size:12.5px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  #inputArchivos{display:none;}
+
+  .chips{display:flex; gap:1px; flex-wrap:wrap; margin-bottom:28px; background:var(--linea); border:1px solid var(--linea);}
+  .chip{background:var(--papel-panel); padding:20px 26px; min-width:170px; flex:1;}
+  .chip .valor{font-size:26px; font-weight:400; letter-spacing:-.01em;}
+  .chip .etiqueta{font-size:10.5px; color:var(--tinta-suave); text-transform:uppercase; letter-spacing:.14em; margin-top:6px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .chip.cred .valor{color:var(--verde);}
+  .chip.deb .valor{color:var(--rojo);}
+
+  .validacion{margin-bottom:28px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .val-item{display:flex; gap:10px; align-items:flex-start; padding:10px 16px; font-size:13px; margin-bottom:1px; border-left:2px solid transparent;}
+  .val-ok{background:var(--verde-fondo); color:#3d4a33; border-left-color:var(--verde);}
+  .val-error{background:var(--rojo-fondo); color:#7a3626; border-left-color:var(--rojo);}
+  .val-aviso{background:var(--ambar-fondo); color:#6e4f1a; border-left-color:var(--ambar);}
+
+  .acciones{display:flex; gap:14px; align-items:center; margin-bottom:24px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  button.descargar{
+    background:var(--tinta); color:var(--papel); border:none; border-radius:0; padding:14px 30px;
+    font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:500; cursor:pointer; transition:background .15s;
+  }
+  button.descargar:hover{background:var(--acento);}
+  button.descargar:disabled{background:#c9c2b5; cursor:not-allowed;}
+  button.limpiar{
+    background:transparent; color:var(--tinta-suave); border:1px solid var(--linea); border-radius:0;
+    padding:13px 20px; font-size:12px; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; transition:border-color .15s,color .15s;
+  }
+  button.limpiar:hover{border-color:var(--rojo); color:var(--rojo);}
+
+  .tabla-marco{overflow:auto; max-height:560px; border:1px solid var(--linea);}
+  table{border-collapse:collapse; width:100%; font-size:13px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  thead th{
+    position:sticky; top:0; background:var(--tinta); color:var(--papel); padding:12px 14px;
+    text-align:left; font-weight:500; white-space:nowrap; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  }
+  tbody td{padding:10px 14px; border-bottom:1px solid var(--linea); vertical-align:top;}
+  tbody tr:hover{background:#f4f0e8;}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  td.cred{color:var(--verde); font-weight:600;}
+  td.deb{color:var(--rojo); font-weight:600;}
+  tr.fila-error td{background:var(--rojo-fondo) !important;}
+  .detalle-celda{max-width:520px; color:var(--tinta-suave);}
+  .estado-proceso{font-size:13px; color:var(--acento); padding:10px 2px; font-family:-apple-system,'Segoe UI',sans-serif;}
+  .oculto{display:none;}
+  footer{
+    font-size:12px; color:var(--tinta-suave); margin-top:8px; line-height:1.7; padding:28px 4px 0;
+    border-top:1px solid var(--linea); font-family:-apple-system,'Segoe UI',sans-serif;
+  }
+  footer strong{color:var(--tinta); font-weight:600;}
+</style>
+</head>
+<body>
+<div class="contenedor">
+  <header>
+    <a class="volver" href="/">← Contar</a>
+    <div class="marca">Movimientos · Argentina</div>
+    <h1>Extractor de resúmenes bancarios</h1>
+    <p>Cargá tus resúmenes en PDF o Excel y obtené cada movimiento del mes ordenado en una planilla. Todo se procesa en tu computadora — los datos nunca se envían a ningún lado.</p>
+  </header>
+
+  <div class="panel">
+    <div class="rotulo-seccion">Paso 1 — Origen</div>
+    <div class="controles">
+      <div class="campo">
+        <label for="selBanco">Banco del resumen</label>
+        <select id="selBanco">
+          <option value="auto">Detección automática</option>
+          <option value="galicia">Banco Galicia</option>
+          <option value="bancor">Banco de Córdoba (Bancor)</option>
+          <option value="frances">BBVA Francés</option>
+          <option value="nacion">Banco Nación</option>
+          <option value="mercadopago">Mercado Pago</option>
+          <option value="santander">Banco Santander</option>
+          <option value="icbc">ICBC</option>
+          <option value="hsbc">HSBC</option>
+          <option value="macro">Banco Macro</option>
+          <option value="ciudad">Banco Ciudad</option>
+        </select>
+      </div>
+    </div>
+    <div class="nota-banco" id="notaBanco"></div>
+    <div class="dropzone" id="zona">
+      <div class="icono">✦</div>
+      <p><strong>Arrastrá acá tus resúmenes</strong> o hacé clic para elegirlos</p>
+      <small>PDF, Excel (.xlsx / .xls) o CSV — podés cargar varios a la vez</small>
+    </div>
+    <input type="file" id="inputArchivos" multiple accept=".pdf,.xlsx,.xls,.csv">
+    <div class="estado-proceso oculto" id="estado"></div>
+  </div>
+
+  <div id="resultados" class="oculto">
+    <div class="chips" id="chips"></div>
+    <div class="panel validacion" id="panelValidacion"></div>
+    <div class="panel">
+      <div class="rotulo-seccion">Paso 2 — Resultado</div>
+      <div class="acciones">
+        <button class="descargar" id="btnDescargar">Descargar Excel</button>
+        <button class="limpiar" id="btnLimpiar">Limpiar todo</button>
+        <span id="notaFilas" style="font-size:12px;color:var(--tinta-suave);font-family:-apple-system,'Segoe UI',sans-serif;"></span>
+      </div>
+      <div class="tabla-marco">
+        <table id="tabla">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <strong>Notas —</strong> Los diez bancos del selector (Galicia, Córdoba, Santander, Francés, Nación, Mercado Pago, ICBC, HSBC, Macro y Ciudad)
+    tienen su extracción propia, calibrada y verificada contra un resumen real. Para sumar otro banco hace falta un resumen real de ese banco: no hay parser genérico.
+    ICBC sólo imprime el saldo al cierre de cada día/grupo, por lo que la columna Saldo queda en blanco en las filas intermedias (así figura en el resumen original).
+    La app valida cada fila contra la cadena de saldos del propio resumen y contra los totales declarados por el banco: si algo no coincide, lo marca en rojo — nunca inventa datos.
+  </footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   Utilidades
+   ============================================================ */
+// Acepta signo adelante (-1.234,56 / -$ 1.234,56) y también al final (1.234,56- estilo contable de Galicia)
+const NUM_RE_SRC = '(?:-?\\$\\s*)?-?\\d{1,3}(?:\\.\\d{3})*,\\d{2}-?';
+const TAIL2_RE = new RegExp('(' + NUM_RE_SRC + ')\\s+(' + NUM_RE_SRC + ')\\s*$');
+const TAIL1_RE = new RegExp('(' + NUM_RE_SRC + ')\\s*$');
+const NUM_G_RE = new RegExp(NUM_RE_SRC, 'g');
+
+function parseNum(s){
+  s = String(s).replace(/\$/g,'').replace(/\s/g,'');
+  const neg = s.indexOf('-') !== -1;
+  s = s.replace(/-/g,'').replace(/\./g,'').replace(',', '.');
+  const v = parseFloat(s);
+  return neg ? -v : v;
+}
+function aCentavos(v){ return Math.round(v * 100); }
+function igualCent(a, b){ return Math.abs(aCentavos(a) - aCentavos(b)) <= 1; }
+const fmtAR = new Intl.NumberFormat('es-AR', {minimumFractionDigits:2, maximumFractionDigits:2});
+function fmt(v){ return v === null || v === undefined || v === '' ? '' : fmtAR.format(v); }
+function sinAcentos(s){ return s.normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function escaparHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   Extracción de líneas de texto del PDF (pdf.js)
+   Agrupa ítems por coordenada Y y los ordena por X.
+   Filtra texto rotado (márgenes verticales, ej. BBVA).
+   ============================================================ */
+if (window.pdfjsLib && window.pdfjsWorker) {
+  // El worker se cargó por <script>, pdf.js lo usa como "fake worker" (funciona con file://)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'lib/pdf.worker.min.js';
+}
+
+async function pdfALineas(datos){
+  const doc = await pdfjsLib.getDocument({data: datos}).promise;
+  const paginas = [];
+  let textoCompleto = '';
+  for (let p = 1; p <= doc.numPages; p++){
+    const pagina = await doc.getPage(p);
+    const tc = await pagina.getTextContent();
+    const filas = []; // {y, items:[{x, w, str}]}
+    for (const it of tc.items){
+      if (!it.str || !it.str.trim()) { textoCompleto += it.str || ''; continue; }
+      textoCompleto += it.str + ' ';
+      const t = it.transform;
+      const rotado = Math.abs(t[1]) > 0.01 || Math.abs(t[2]) > 0.01;
+      if (rotado) continue;
+      const y = t[5];
+      let fila = null;
+      for (const f of filas){ if (Math.abs(f.y - y) <= 2.5){ fila = f; break; } }
+      if (!fila){ fila = {y: y, items: []}; filas.push(fila); }
+      fila.items.push({x: t[4], w: it.width || 0, str: it.str});
+    }
+    filas.sort((a,b) => b.y - a.y);
+    const lineas = filas.map(f => {
+      f.items.sort((a,b) => a.x - b.x);
+      let linea = '';
+      let finPrevio = null;
+      for (const it of f.items){
+        if (finPrevio !== null && it.x - finPrevio > 1.2) linea += ' ';
+        linea += it.str;
+        finPrevio = it.x + it.w;
+      }
+      return linea.replace(/\s+/g,' ').trim();
+    }).filter(l => l.length > 0);
+    paginas.push(lineas);
+    textoCompleto += '\n';
+  }
+  return {paginas: paginas, textoCompleto: textoCompleto};
+}
+
+/* ============================================================
+   Detección automática del banco
+   ============================================================ */
+function detectarBanco(textoCompleto, paginas){
+  const t = sinAcentos(textoCompleto).toUpperCase();
+  const lineasTodas = sinAcentos(paginas.flat().join('\n')).toUpperCase();
+  // Se detecta primero por encabezados de tabla (únicos de cada banco) y recién
+  // después por nombres, porque los detalles de transferencias suelen mencionar
+  // otros bancos ("BANCO DE GALICIA Y B", "Merpago*...", "HSBC BANK", etc.)
+  if (/FECHA DESCRIPCION ORIGEN CREDITO DEBITO SALDO/.test(lineasTodas)) return 'galicia';
+  if (/FECHA COMPROBANTE MOVIMIENTO DEBITO CREDITO SALDO EN CUENTA/.test(lineasTodas)
+      || t.indexOf('BANCO SANTANDER ARGENTINA') !== -1) return 'santander';
+  if (/FECHA CONCEPTO F\.?VALOR COMPROBANTE ORIGEN CANAL DEBITOS CREDITOS SALDOS/.test(lineasTodas)
+      || t.replace(/\s/g,'').indexOf('INDUSTRIALANDCOMMERCIALBANKOFCHINA') !== -1) return 'icbc';
+  // HSBC se detecta SÓLO por su encabezado de tabla: el nombre "HSBC BANK
+  // ARGENTINA" aparece como contraparte en extractos de otros bancos (p. ej.
+  // en el de Galicia), así que buscarlo por nombre daría falsos positivos.
+  if (/FECHA REFERENCIA NRO DEBITO CREDITO SALDO/.test(lineasTodas)) return 'hsbc';
+  if (/FECHA DESCRIPCION REFERENCIA DEBITOS CREDITOS SALDO/.test(lineasTodas)) return 'macro';
+  if (/FECHA NRO\. DE CAUSAL CONCEPTO IMPORTE SALDO/.test(lineasTodas)) return 'macro';
+  if (/FECHA CONCEPTO DEBITO CREDITO SALDO DESCRIPCION DE MOVIMIENTO/.test(lineasTodas)) return 'ciudad';
+  if (t.indexOf('BANCOR.COM.AR') !== -1 || t.indexOf('BANCO DE LA PROVINCIA DE CORDOBA') !== -1) return 'bancor';
+  if (t.indexOf('NACION ARGENTINA') !== -1 && /HOJA\s*:/.test(t)) return 'nacion';
+  if (t.indexOf('MERCADOPAGO.COM') !== -1
+      || (t.indexOf('MERCADO PAGO') !== -1 && /DETALLE DE MOVIMIENTOS/.test(lineasTodas))) return 'mercadopago';
+  if (t.indexOf('BBVA') !== -1 || t.indexOf('AVBB') !== -1) return 'frances';
+  return null;
+}
+
+const NOMBRES_BANCO = {
+  galicia: 'Banco Galicia', bancor: 'Banco de Córdoba (Bancor)', frances: 'BBVA Francés',
+  nacion: 'Banco Nación', mercadopago: 'Mercado Pago', santander: 'Banco Santander',
+  icbc: 'ICBC', hsbc: 'HSBC', macro: 'Banco Macro', ciudad: 'Banco Ciudad', excel: 'Planilla (Excel/CSV)'
+};
+
+/* ============================================================
+   Parser: BANCO GALICIA
+   Movimiento: DD/MM/AA DETALLE [origen] IMPORTE SALDO
+   Débitos en negativo. Fin de sección: "Total $ ..."
+   ============================================================ */
+function parseGalicia(paginas){
+  const movs = [];
+  const avisos = [];
+  let declarado = null; // {creditos, debitos, saldoFinal}
+  let estado = 'antes';
+  bucle:
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea);
+      if (estado === 'antes'){
+        if (/^Fecha Descripcion Origen Credito Debito Saldo/i.test(norm)) estado = 'en';
+        continue;
+      }
+      if (/^Fecha Descripcion Origen Credito Debito Saldo/i.test(norm)) continue;
+      if (/^Resumen de Cuenta/i.test(norm) && !/^\d/.test(norm)) continue;
+      if (/Pagina \d+\s*\/\s*\d+$/i.test(norm)) continue;
+      if (/^\d{15,}[A-Z]?$/.test(norm)) continue;
+      if (/^Total \$/.test(norm)){
+        const nums = linea.match(NUM_G_RE) || [];
+        if (nums.length >= 3){
+          declarado = {
+            creditos: Math.abs(parseNum(nums[0])),
+            debitos: Math.abs(parseNum(nums[1])),
+            saldoFinal: parseNum(nums[2])
+          };
+        }
+        break bucle;
+      }
+      const mFecha = linea.match(/^(\d{2}\/\d{2}\/\d{2})\s+(.*)$/);
+      if (mFecha){
+        const resto = mFecha[2];
+        const mNums = resto.match(TAIL2_RE);
+        if (mNums){
+          const importe = parseNum(mNums[1]);
+          const saldo = parseNum(mNums[2]);
+          const detalle = resto.slice(0, resto.length - mNums[0].length).trim();
+          movs.push({
+            fecha: mFecha[1], detalle: detalle,
+            credito: importe > 0 ? importe : null,
+            debito: importe < 0 ? Math.abs(importe) : null,
+            saldo: saldo, cuenta: null, error: false
+          });
+        } else {
+          avisos.push('Línea con fecha sin importes reconocibles: "' + linea + '"');
+        }
+      } else if (movs.length > 0){
+        movs[movs.length - 1].detalle += ' | ' + linea;
+      }
+    }
+  }
+  if (estado === 'antes') avisos.push('No se encontró la tabla de movimientos de Galicia en este archivo.');
+  return {movs: movs, avisos: avisos, saldoInicial: null, declarado: declarado, clasifPorSaldo: false};
+}
+
+/* ============================================================
+   Parser: BANCOR (Banco de Córdoba)
+   Movimiento: DD/MM DETALLE [ref] IMPORTE SALDO (sin signo).
+   Crédito/débito según variación del saldo (dato del resumen).
+   Inicio: "SALDO RES. ANTERIOR". Fin: "Total ..." / texto legal.
+   ============================================================ */
+function parseBancor(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoInicial = null;
+  let saldoPrevio = null;
+  let periodo = null; // {m1,a1,m2,a2}
+  let estado = 'antes';
+
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      if (!periodo){
+        const mP = linea.match(/(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2})\/(\d{2})\/(\d{4})/);
+        if (mP) periodo = {m1: +mP[2], a1: +mP[3], m2: +mP[5], a2: +mP[6]};
+      }
+      if (estado === 'antes'){
+        if (/^SALDO RES\.? ANTERIOR/i.test(linea)){
+          const mS = linea.match(TAIL1_RE);
+          if (mS){ saldoInicial = parseNum(mS[1]); saldoPrevio = saldoInicial; estado = 'en'; }
+        }
+        continue;
+      }
+      // Fin real: bloque "Total Impuesto al Valor Agregado: $..." (el texto legal
+      // "Se presume la conformidad" aparece al pie de TODAS las páginas, no es fin)
+      if (/^Total .*\$/i.test(linea)){ estado = 'fin'; break; }
+      const mFecha = linea.match(/^(\d{2}\/(\d{2}))\s+(.+)$/);
+      if (mFecha){
+        const resto = mFecha[3];
+        const mNums = resto.match(TAIL2_RE);
+        if (!mNums){ avisos.push('Línea con fecha sin importe+saldo: "' + linea + '"'); continue; }
+        const importe = Math.abs(parseNum(mNums[1]));
+        const saldo = parseNum(mNums[2]);
+        const detalle = resto.slice(0, resto.length - mNums[0].length).trim();
+        let credito = null, debito = null, error = false;
+        if (saldoPrevio !== null && igualCent(saldoPrevio + importe, saldo)) credito = importe;
+        else if (saldoPrevio !== null && igualCent(saldoPrevio - importe, saldo)) debito = importe;
+        else {
+          error = true;
+          if (saldo >= (saldoPrevio === null ? 0 : saldoPrevio)) credito = importe; else debito = importe;
+        }
+        let fecha = mFecha[1];
+        if (periodo){
+          const mes = +mFecha[2];
+          const anio = (periodo.a1 !== periodo.a2 && mes < periodo.m1) ? periodo.a2 : periodo.a1;
+          fecha = mFecha[1] + '/' + anio;
+        }
+        movs.push({fecha: fecha, detalle: detalle, credito: credito, debito: debito, saldo: saldo, cuenta: null, error: error});
+        saldoPrevio = saldo;
+      } else if (/^\d{11}\s*-\s*/.test(linea) && movs.length > 0){
+        movs[movs.length - 1].detalle += ' | ' + linea;
+      }
+      // el resto (membrete, titular, pies) se descarta
+    }
+    if (estado === 'fin') break;
+  }
+  if (saldoInicial === null) avisos.push('No se encontró "SALDO RES. ANTERIOR" (inicio de movimientos de Bancor).');
+  return {movs: movs, avisos: avisos, saldoInicial: saldoInicial, declarado: null, clasifPorSaldo: true};
+}
+
+/* ============================================================
+   Parser: BBVA FRANCÉS (resumen multi-cuenta)
+   Secciones "CC $ 267-.../. (Cta.Cte.Bancaria) - Iva-..."
+   Movimiento: DD/MM [D] CONCEPTO IMPORTE SALDO (débitos en negativo)
+   Cada cuenta declara SALDO ANTERIOR / SALDO AL / TOTAL MOVIMIENTOS
+   ============================================================ */
+function parseFrances(paginas){
+  const movs = [];
+  const avisos = [];
+  const cuentas = []; // {nombre, saldoInicial, saldoFinalDecl, debitosDecl, creditosDecl, movs:[]}
+  let cuenta = null;
+  let anioRef = null, mesRef = null;
+  let terminado = false;
+
+  const todas = paginas.flat();
+  for (const linea of todas){
+    const mInfo = sinAcentos(linea).match(/informacion al:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+    if (mInfo && anioRef === null){ anioRef = +mInfo[3]; mesRef = +mInfo[2]; }
+  }
+
+  for (const linea of todas){
+    if (terminado) break;
+    if (/Movimientos pendientes de debitar/i.test(linea)){ terminado = true; break; }
+    const mCta = linea.match(/^CC\s+(U\$S|\$)\s+([\d\-\/]+)\s+\(Cta\.Cte\.Bancaria\)\s*-\s*Iva/i);
+    if (mCta){
+      cuenta = {nombre: 'CC ' + mCta[1] + ' ' + mCta[2], saldoInicial: null, saldoFinalDecl: null,
+                debitosDecl: null, creditosDecl: null, movs: []};
+      cuentas.push(cuenta);
+      continue;
+    }
+    if (!cuenta) continue;
+    if (/^SALDO ANTERIOR\b/i.test(linea)){
+      const mS = linea.match(TAIL1_RE);
+      if (mS) cuenta.saldoInicial = parseNum(mS[1]);
+      continue;
+    }
+    if (/^SALDO AL\b/i.test(linea)){
+      const mS = linea.match(TAIL1_RE);
+      if (mS) cuenta.saldoFinalDecl = parseNum(mS[1]);
+      continue;
+    }
+    if (/^TOTAL MOVIMIENTOS\b/i.test(linea)){
+      const nums = linea.match(NUM_G_RE) || [];
+      if (nums.length >= 2){
+        cuenta.debitosDecl = Math.abs(parseNum(nums[0]));
+        cuenta.creditosDecl = Math.abs(parseNum(nums[1]));
+      }
+      continue;
+    }
+    const mFecha = linea.match(/^(\d{2}\/(\d{2}))\s+(.+)$/);
+    if (mFecha){
+      const resto = mFecha[3];
+      const mNums = resto.match(TAIL2_RE);
+      if (!mNums) continue;
+      const importe = parseNum(mNums[1]);
+      const saldo = parseNum(mNums[2]);
+      const detalle = resto.slice(0, resto.length - mNums[0].length).trim();
+      let fecha = mFecha[1];
+      if (anioRef !== null){
+        const mes = +mFecha[2];
+        const anio = (mes > mesRef) ? anioRef - 1 : anioRef;
+        fecha = mFecha[1] + '/' + anio;
+      }
+      const mov = {
+        fecha: fecha, detalle: detalle,
+        credito: importe > 0 ? importe : null,
+        debito: importe < 0 ? Math.abs(importe) : null,
+        saldo: saldo, cuenta: cuenta.nombre, error: false
+      };
+      cuenta.movs.push(mov);
+      movs.push(mov);
+    }
+  }
+
+  // Validaciones declaradas por cuenta
+  for (const c of cuentas){
+    if (c.movs.length === 0 && (c.debitosDecl === 0 || c.debitosDecl === null) ) continue;
+    const sumaCred = c.movs.reduce((s,m) => s + (m.credito || 0), 0);
+    const sumaDeb = c.movs.reduce((s,m) => s + (m.debito || 0), 0);
+    if (c.creditosDecl !== null && !igualCent(sumaCred, c.creditosDecl))
+      avisos.push(c.nombre + ': créditos extraídos ' + fmt(sumaCred) + ' ≠ declarados ' + fmt(c.creditosDecl));
+    if (c.debitosDecl !== null && !igualCent(sumaDeb, c.debitosDecl))
+      avisos.push(c.nombre + ': débitos extraídos ' + fmt(sumaDeb) + ' ≠ declarados ' + fmt(c.debitosDecl));
+    if (c.saldoFinalDecl !== null && c.movs.length > 0 && !igualCent(c.movs[c.movs.length-1].saldo, c.saldoFinalDecl))
+      avisos.push(c.nombre + ': último saldo ' + fmt(c.movs[c.movs.length-1].saldo) + ' ≠ SALDO AL declarado ' + fmt(c.saldoFinalDecl));
+    // cadena de saldos por cuenta
+    let prev = c.saldoInicial;
+    for (const m of c.movs){
+      if (prev !== null && !igualCent(prev + (m.credito || 0) - (m.debito || 0), m.saldo)) m.error = true;
+      prev = m.saldo;
+    }
+  }
+  if (cuentas.length === 0) avisos.push('No se encontraron secciones de cuenta del BBVA Francés en este archivo.');
+  return {movs: movs, avisos: avisos, saldoInicial: cuentas.length ? cuentas[0].saldoInicial : null,
+          declarado: null, clasifPorSaldo: false, cadenaValidadaPorCuenta: true};
+}
+
+/* ============================================================
+   Parser: BANCO NACIÓN
+   Movimiento: DD/MM/AA DETALLE COMPROB IMPORTE SALDO (sin signo)
+   Crédito/débito según variación del saldo. "TRANSPORTE" = arrastre
+   de página (se valida, no es movimiento). Fin: "SALDO FINAL".
+   ============================================================ */
+function parseNacion(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoInicial = null;
+  let saldoPrevio = null;
+  let declarado = null;
+  let estado = 'antes';
+
+  bucle:
+  for (const lineas of paginas){
+    for (let linea of lineas){
+      linea = linea.replace(/^_+\s*/, '').trim();
+      if (!linea) continue;
+      if (estado === 'antes'){
+        if (/^SALDO ANTERIOR\b/i.test(linea)){
+          const mS = linea.match(TAIL1_RE);
+          if (mS){ saldoInicial = parseNum(mS[1]); saldoPrevio = saldoInicial; estado = 'en'; }
+        }
+        continue;
+      }
+      if (/^SALDO FINAL\b/i.test(linea)){
+        const mS = linea.match(TAIL1_RE);
+        if (mS) declarado = {saldoFinal: parseNum(mS[1])};
+        break bucle;
+      }
+      const mTrans = linea.match(/^TRANSPORTE\b/i);
+      if (mTrans){
+        const mS = linea.match(TAIL1_RE);
+        if (mS && saldoPrevio !== null && !igualCent(parseNum(mS[1]), saldoPrevio))
+          avisos.push('TRANSPORTE de página (' + fmt(parseNum(mS[1])) + ') no coincide con el saldo acumulado (' + fmt(saldoPrevio) + ').');
+        continue;
+      }
+      const mFecha = linea.match(/^(\d{2}\/\d{2}\/\d{2})\s+(.+)$/);
+      if (mFecha){
+        const resto = mFecha[2];
+        const mNums = resto.match(TAIL2_RE);
+        if (!mNums){ avisos.push('Línea con fecha sin importe+saldo: "' + linea + '"'); continue; }
+        const importe = Math.abs(parseNum(mNums[1]));
+        const saldo = parseNum(mNums[2]);
+        const detalle = resto.slice(0, resto.length - mNums[0].length).trim();
+        let credito = null, debito = null, error = false;
+        if (saldoPrevio !== null && igualCent(saldoPrevio + importe, saldo)) credito = importe;
+        else if (saldoPrevio !== null && igualCent(saldoPrevio - importe, saldo)) debito = importe;
+        else {
+          error = true;
+          if (saldo >= (saldoPrevio === null ? 0 : saldoPrevio)) credito = importe; else debito = importe;
+        }
+        movs.push({fecha: mFecha[1], detalle: detalle, credito: credito, debito: debito, saldo: saldo, cuenta: null, error: error});
+        saldoPrevio = saldo;
+      }
+      // membrete / titular / textos legales: se descartan
+    }
+  }
+  if (saldoInicial === null) avisos.push('No se encontró "SALDO ANTERIOR" (inicio de movimientos de Banco Nación).');
+  return {movs: movs, avisos: avisos, saldoInicial: saldoInicial, declarado: declarado, clasifPorSaldo: true};
+}
+
+/* ============================================================
+   Parser: MERCADO PAGO
+   Encabezado: Fecha | Descripción | ID de la operación | Valor | Saldo
+   Declara Saldo inicial / Saldo final / Entradas / Salidas.
+   (Calibrado con la estructura del encabezado; el resumen de
+   ejemplo no tenía movimientos.)
+   ============================================================ */
+function parseMercadoPago(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoInicial = null, saldoFinalDecl = null, entradasDecl = null, salidasDecl = null;
+  let estado = 'antes';
+
+  const todas = paginas.flat();
+  for (const linea of todas){
+    const norm = sinAcentos(linea);
+    let m;
+    if ((m = norm.match(/Saldo inicial:\s*(.+)$/i)) && saldoInicial === null){
+      const n = m[1].match(NUM_G_RE); if (n) saldoInicial = parseNum(n[0]);
+    }
+    if ((m = norm.match(/Saldo final:\s*(.+)$/i)) && saldoFinalDecl === null){
+      const n = m[1].match(NUM_G_RE); if (n) saldoFinalDecl = parseNum(n[0]);
+    }
+    if ((m = norm.match(/^Entradas:\s*(.+)$/i)) && entradasDecl === null){
+      const n = m[1].match(NUM_G_RE); if (n) entradasDecl = Math.abs(parseNum(n[0]));
+    }
+    if ((m = norm.match(/^Salidas:\s*(.+)$/i)) && salidasDecl === null){
+      const n = m[1].match(NUM_G_RE); if (n) salidasDecl = Math.abs(parseNum(n[0]));
+    }
+  }
+
+  let saldoPrevio = saldoInicial;
+  for (const linea of todas){
+    const norm = sinAcentos(linea);
+    if (estado === 'antes'){
+      if (/DETALLE DE MOVIMIENTOS/i.test(norm)) estado = 'en';
+      continue;
+    }
+    if (/Fecha de generacion/i.test(norm) || /Mercado Libre S\.R\.L\./i.test(linea)) break;
+    if (/^(ID de la|operacion$|Fecha Descripcion)/i.test(norm)) continue;
+    const mFecha = linea.match(/^(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})\s+(.+)$/);
+    if (mFecha){
+      const resto = mFecha[2];
+      const mNums = resto.match(TAIL2_RE);
+      if (!mNums){ avisos.push('Línea con fecha sin valor+saldo: "' + linea + '"'); continue; }
+      const valor = parseNum(mNums[1]);
+      const saldo = parseNum(mNums[2]);
+      const detalle = resto.slice(0, resto.length - mNums[0].length).trim();
+      let error = false;
+      if (saldoPrevio !== null && !igualCent(saldoPrevio + valor, saldo)) error = true;
+      movs.push({
+        fecha: mFecha[1], detalle: detalle,
+        credito: valor > 0 ? valor : null,
+        debito: valor < 0 ? Math.abs(valor) : null,
+        saldo: saldo, cuenta: null, error: error
+      });
+      saldoPrevio = saldo;
+    } else if (movs.length > 0){
+      movs[movs.length - 1].detalle += ' | ' + linea;
+    }
+  }
+
+  const declarado = {};
+  if (entradasDecl !== null) declarado.creditos = entradasDecl;
+  if (salidasDecl !== null) declarado.debitos = salidasDecl;
+  if (saldoFinalDecl !== null) declarado.saldoFinal = saldoFinalDecl;
+  if (movs.length === 0 && saldoInicial !== null && saldoFinalDecl !== null && igualCent(saldoInicial, saldoFinalDecl)){
+    avisos.push('El período no registra movimientos (saldo inicial = saldo final, Entradas y Salidas $0,00). No es un error.');
+  }
+  return {movs: movs, avisos: avisos, saldoInicial: saldoInicial,
+          declarado: Object.keys(declarado).length ? declarado : null,
+          clasifPorSaldo: false, cadenaYaValidada: true};
+}
+
+/* ============================================================
+   Parser: BANCO SANTANDER
+   Secciones "Movimientos en pesos" / "Movimientos en dólares".
+   Encabezado: Fecha Comprobante Movimiento Débito Crédito Saldo en cuenta
+   "DD/MM/AA Saldo Inicial $ ..." inicia cada cuenta.
+   Movimiento: [comprobante] DESCRIPCIÓN $ IMPORTE $ SALDO (sin signo →
+   crédito/débito por variación del saldo). La fecha suele imprimirse en una
+   línea aparte (fila de dos renglones): se asigna al movimiento contiguo.
+   Fin: "Totales de retencion impuesto ley 25413".
+   ============================================================ */
+function parseSantander(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoInicial = null;
+  let saldoPrevio = null;
+  let estado = 'antes';
+  let moneda = '$';
+  let cuentaNro = null;
+  let fechaPendiente = null;
+
+  function etiquetaCuenta(){
+    return (cuentaNro ? cuentaNro : 'Cuenta') + ' (' + moneda + ')';
+  }
+
+  bucle:
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea);
+      if (/^Totales de retencion/i.test(norm)) break bucle;
+      const mSec = norm.match(/^Movimientos en (pesos|dolares)/i);
+      if (mSec){
+        moneda = /dolares/i.test(mSec[1]) ? 'U$S' : '$';
+        estado = 'antes';
+        continue;
+      }
+      const mCta = linea.match(/^Cuenta Corriente N.?\s*([\d\-\/]+)/i);
+      if (mCta){ cuentaNro = 'CC ' + mCta[1]; continue; }
+      if (/^Fecha Comprobante Movimiento/i.test(norm)) continue;
+      if (/Salvo error u omisi/i.test(norm)) continue;
+      if (/^\d+\s*-\s*\d+$/.test(norm)) continue; // pie "18 - 22"
+      const mIni = linea.match(/^(\d{2}\/\d{2}\/\d{2})\s+Saldo Inicial\b/i);
+      if (mIni){
+        const mS = linea.match(TAIL1_RE);
+        if (mS){
+          saldoPrevio = parseNum(mS[1]);
+          if (saldoInicial === null) saldoInicial = saldoPrevio;
+          estado = 'en';
+          fechaPendiente = null;
+        }
+        continue;
+      }
+      if (estado !== 'en') continue;
+      // fecha sola en su línea (fila de dos renglones)
+      if (/^\d{2}\/\d{2}\/\d{2}$/.test(linea)){
+        const sinFecha = [...movs].reverse().find(m => m.fecha === null);
+        if (sinFecha) sinFecha.fecha = linea;
+        else fechaPendiente = linea;
+        continue;
+      }
+      let fechaInline = null;
+      let cuerpo = linea;
+      const mF = linea.match(/^(\d{2}\/\d{2}\/\d{2})\s+(.+)$/);
+      if (mF){ fechaInline = mF[1]; cuerpo = mF[2]; }
+      const mNums = cuerpo.match(TAIL2_RE);
+      if (mNums && /\$\s*[\d.]+,\d{2}-?\s*(\$|U\$S)?/.test(cuerpo)){
+        const importe = Math.abs(parseNum(mNums[1]));
+        const saldo = parseNum(mNums[2]);
+        const detalle = cuerpo.slice(0, cuerpo.length - mNums[0].length).trim();
+        let credito = null, debito = null, error = false;
+        if (saldoPrevio !== null && igualCent(saldoPrevio + importe, saldo)) credito = importe;
+        else if (saldoPrevio !== null && igualCent(saldoPrevio - importe, saldo)) debito = importe;
+        else {
+          error = true;
+          if (saldo >= (saldoPrevio === null ? 0 : saldoPrevio)) credito = importe; else debito = importe;
+        }
+        movs.push({fecha: fechaInline || fechaPendiente, detalle: detalle, credito: credito,
+                   debito: debito, saldo: saldo, cuenta: etiquetaCuenta(), error: error});
+        fechaPendiente = null;
+        saldoPrevio = saldo;
+      } else if (movs.length > 0 && !mF){
+        movs[movs.length - 1].detalle += ' | ' + linea;
+      }
+    }
+  }
+  // fechas sin asignar: heredan la del movimiento anterior (misma fila partida)
+  let ultimaFecha = null;
+  for (const m of movs){
+    if (m.fecha === null && ultimaFecha !== null) m.fecha = ultimaFecha;
+    if (m.fecha !== null) ultimaFecha = m.fecha;
+  }
+  const sinFecha = movs.filter(m => m.fecha === null).length;
+  if (sinFecha > 0) avisos.push(sinFecha + ' movimiento(s) quedaron sin fecha asignada — revisalos.');
+  if (saldoInicial === null) avisos.push('No se encontró "Saldo Inicial" (inicio de movimientos de Santander).');
+  return {movs: movs, avisos: avisos, saldoInicial: saldoInicial, declarado: null, clasifPorSaldo: true};
+}
+
+/* ============================================================
+   Parser: ICBC (Industrial and Commercial Bank of China)
+   Encabezado: FECHA CONCEPTO F.VALOR COMPROBANTE ORIGEN CANAL DEBITOS CREDITOS SALDOS
+   Inicio: "SALDO ULTIMO EXTRACTO AL ...". Fin: "SALDO FINAL AL ...".
+   Movimiento: DD-MM CONCEPTO ... IMPORTE [SALDO]
+     - el importe es el PRIMER número decimal de la línea; si termina en '-'
+       es débito, si no crédito (los códigos comprobante/origen/canal son
+       enteros sin decimales y no matchean).
+     - el SALDO sólo se imprime al final de cada día/grupo (segundo número
+       decimal, opcional). Puede ser negativo (termina en '-').
+   "SALDO PAGINA ANTERIOR" = arrastre entre páginas (checkpoint, no movimiento).
+   Año tomado de "PERIODO DD-MM-AAAA AL DD-MM-AAAA".
+   Cada movimiento es una sola línea (no hay líneas de continuación).
+   ============================================================ */
+function parseICBC(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoInicial = null;
+  let saldoCalc = null;      // saldo corriente calculado (para validar contra los impresos)
+  let saldoFinalDecl = null;
+  let periodo = null;        // {m1, a1, a2}
+  let estado = 'antes';
+
+  bucle:
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea);
+      if (!periodo){
+        const mP = norm.match(/PERIODO\s+\d{2}-(\d{2})-(\d{4})\s+AL\s+\d{2}-\d{2}-(\d{4})/i);
+        if (mP) periodo = {m1: +mP[1], a1: +mP[2], a2: +mP[3]};
+      }
+      // Inicio: saldo del último extracto
+      const mIni = norm.match(/^SALDO ULTIMO EXTRACTO AL \S+\s+(.+)$/i);
+      if (mIni){
+        const nums = mIni[1].match(NUM_G_RE);
+        if (nums){ saldoInicial = parseNum(nums[nums.length-1]); saldoCalc = saldoInicial; estado = 'en'; }
+        continue;
+      }
+      // Arrastre entre páginas: checkpoint contra el saldo acumulado
+      const mPag = norm.match(/^SALDO PAGINA ANTERIOR\s+(.+)$/i);
+      if (mPag){
+        const nums = mPag[1].match(NUM_G_RE);
+        if (nums && saldoCalc !== null && !igualCent(parseNum(nums[nums.length-1]), saldoCalc))
+          avisos.push('SALDO PAGINA ANTERIOR (' + fmt(parseNum(nums[nums.length-1])) + ') no coincide con el saldo acumulado (' + fmt(saldoCalc) + ').');
+        continue;
+      }
+      // Fin: saldo final declarado
+      const mFin = norm.match(/SALDO FINAL AL \S+\s+([\d.]+,\d{2}-?)/i);
+      if (mFin){ saldoFinalDecl = parseNum(mFin[1]); break bucle; }
+
+      if (estado !== 'en') continue;
+      if (/^FECHA CONCEPTO/i.test(norm)) continue;
+      if (/^CONTINUA AL DORSO/i.test(norm)) break; // fin de la página, sigue en la próxima
+
+      const mFecha = linea.match(/^(\d{2})-(\d{2})\s+(.+)$/);
+      if (!mFecha) continue; // membrete, textos legales, separadores: se descartan
+      const resto = mFecha[3];
+      // números decimales de la línea (con su posición) — ignora comprobante/origen/canal (enteros)
+      const nums = [];
+      NUM_G_RE.lastIndex = 0;
+      let mm;
+      while ((mm = NUM_G_RE.exec(resto)) !== null) nums.push({v: mm[0], i: mm.index});
+      if (nums.length === 0){ avisos.push('Línea con fecha sin importe: "' + linea + '"'); continue; }
+
+      const importe = parseNum(nums[0].v);              // débito si viene en negativo (termina en '-')
+      const saldo = nums.length >= 2 ? parseNum(nums[1].v) : null;
+      const detalle = resto.slice(0, nums[0].i).trim();
+
+      let anio = periodo ? periodo.a1 : null;
+      if (periodo && periodo.a1 !== periodo.a2 && +mFecha[2] < periodo.m1) anio = periodo.a2;
+      const fecha = mFecha[1] + '-' + mFecha[2] + (anio ? '-' + anio : '');
+
+      let error = false;
+      if (saldoCalc !== null){
+        saldoCalc += importe;
+        if (saldo !== null && !igualCent(saldoCalc, saldo)) error = true;
+      }
+      movs.push({
+        fecha: fecha, detalle: detalle,
+        credito: importe > 0 ? importe : null,
+        debito: importe < 0 ? Math.abs(importe) : null,
+        saldo: saldo, cuenta: null, error: error
+      });
+    }
+  }
+
+  // El saldo final declarado es textual ("SALDO FINAL AL ..."): si el último
+  // movimiento no traía saldo impreso, se lo asigna para poder validar el cierre.
+  if (saldoFinalDecl !== null && movs.length > 0 && movs[movs.length-1].saldo === null)
+    movs[movs.length-1].saldo = saldoFinalDecl;
+
+  if (saldoInicial === null) avisos.push('No se encontró "SALDO ULTIMO EXTRACTO" (inicio de movimientos de ICBC).');
+  const declarado = saldoFinalDecl !== null ? {saldoFinal: saldoFinalDecl} : null;
+  return {movs: movs, avisos: avisos, saldoInicial: saldoInicial, declarado: declarado,
+          clasifPorSaldo: false, cadenaYaValidada: true};
+}
+
+/* ============================================================
+   Parser: HSBC
+   -------------------------------------------------------------
+   Encabezado: FECHA REFERENCIA NRO DEBITO CREDITO SALDO
+   Secciones por cuenta: "CUENTA CORRIENTE EN $ NRO. ..." y
+   "CTA.CTE.ESPECIAL EN U$S NRO. ...". Cada una abre con
+   "- SALDO ANTERIOR <n>" y cierra con "- SALDO FINAL <n>".
+   Fin del detalle: "DETALLE DE IMPUESTOS".
+
+   Tres particularidades de este banco:
+
+   1) Los importes vienen en FORMATO INGLÉS: 39,724.48 (coma de miles,
+      punto decimal), y a veces sin el cero inicial (".40", ".07"). Por eso
+      este parser usa su propio regex y su propio parseo numérico locales —
+      NUM_RE_SRC / parseNum del módulo son para el formato argentino y no se
+      tocan. Ojo: el decimal debe tener exactamente 2 dígitos, si no
+      "IMP. LEY 25.413" se leería como el número 25.41.
+
+   2) La FECHA (DD-MES) se imprime sólo en el primer movimiento de cada día;
+      los siguientes la heredan.
+
+   3) El importe no viene firmado: crédito/débito se deduce comparando
+      saldoPrevio ± importe contra el saldo impreso en la misma línea
+      (verificado además contra la posición de las columnas DEBITO/CREDITO:
+      los dos métodos coinciden en los 103 movimientos de la muestra real).
+   ============================================================ */
+function parseHSBC(paginas){
+  // formato inglés, decimal de exactamente 2 dígitos
+  const NUM_HSBC_G = /(?:\d{1,3}(?:,\d{3})*)?\.\d{2}(?!\d)/g;
+  function numHSBC(s){ return parseFloat(String(s).replace(/,/g, '')); }
+  function numerosDe(linea){ return linea.match(NUM_HSBC_G) || []; }
+
+  const movs = [];
+  const avisos = [];
+  const cuentas = [];      // {nombre, saldoInicial, saldoFinalDecl, movs:[]}
+  let cuenta = null;
+  let anio = null;
+  let fechaActual = null;
+
+  bucle:
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea).toUpperCase();
+
+      if (anio === null){
+        const mP = norm.match(/EXTRACTO DEL \d{2}\/\d{2}\/(\d{4})/);
+        if (mP) anio = mP[1];
+      }
+
+      // apertura de una cuenta
+      const mCta = linea.match(/^(CUENTA CORRIENTE EN \$|CTA\.CTE\.ESPECIAL EN U\$S)\s+NRO\.\s*(\S+)/i);
+      if (mCta){
+        cuenta = {nombre: mCta[1].trim() + ' ' + mCta[2], saldoInicial: null,
+                  saldoFinalDecl: null, movs: []};
+        cuentas.push(cuenta);
+        fechaActual = null;
+        continue;
+      }
+      if (/^DETALLE DE IMPUESTOS/.test(norm)) break bucle;
+      if (!cuenta) continue;
+
+      // encabezados y pies de página
+      if (/^HOJA \d+ DE \d+/.test(norm)) continue;
+      if (/^\d+-[A-Z]$/.test(norm)) continue;              // código de documento (7790168-P)
+      if (/^FECHA REFERENCIA/.test(norm)) continue;
+      if (/DETALLE DE OPERACIONES/.test(norm)) continue;
+
+      const mIni = linea.match(/^-\s+SALDO ANTERIOR\s+(.+)$/i);
+      if (mIni){
+        const n = numerosDe(mIni[1]);
+        if (n.length) cuenta.saldoInicial = numHSBC(n[n.length - 1]);
+        continue;
+      }
+      const mFin = linea.match(/^-\s+SALDO FINAL\s+(.+)$/i);
+      if (mFin){
+        const n = numerosDe(mFin[1]);
+        if (n.length) cuenta.saldoFinalDecl = numHSBC(n[n.length - 1]);
+        cuenta = null;   // la cuenta se cierra acá
+        continue;
+      }
+
+      // movimiento: [DD-MES] - DESCRIPCIÓN NRO IMPORTE SALDO
+      const mMov = linea.match(/^(\d{2}-[A-Z]{3})?\s*-\s+(.+)$/);
+      if (mMov){
+        const cuerpo = mMov[2];
+        const nums = numerosDe(cuerpo);
+        if (nums.length >= 2){
+          if (mMov[1]) fechaActual = mMov[1];
+          const importe = Math.abs(numHSBC(nums[nums.length - 2]));
+          const saldo = numHSBC(nums[nums.length - 1]);
+          // detalle: todo lo anterior al importe
+          const idx = cuerpo.lastIndexOf(nums[nums.length - 2]);
+          const detalle = (idx >= 0 ? cuerpo.slice(0, idx) : cuerpo).trim();
+          const mov = {
+            fecha: fechaActual ? (anio ? fechaActual + '-' + anio : fechaActual) : '',
+            detalle: detalle, credito: null, debito: null,
+            saldo: saldo, cuenta: cuenta.nombre, error: false
+          };
+          movs.push(mov);
+          cuenta.movs.push(mov);
+          mov.__importe = importe;
+          continue;
+        }
+      }
+
+      // línea de continuación (contraparte, CUIT, base del impuesto): al detalle
+      if (movs.length > 0 && cuenta.movs.length > 0)
+        cuenta.movs[cuenta.movs.length - 1].detalle += ' | ' + linea.trim();
+    }
+  }
+
+  // clasificación crédito/débito y validación de la cadena, por cuenta
+  for (const c of cuentas){
+    let prev = c.saldoInicial;
+    for (const m of c.movs){
+      const imp = m.__importe;
+      delete m.__importe;
+      if (prev !== null && igualCent(prev + imp, m.saldo)) m.credito = imp;
+      else if (prev !== null && igualCent(prev - imp, m.saldo)) m.debito = imp;
+      else {
+        m.error = true;
+        if (prev === null || m.saldo >= prev) m.credito = imp; else m.debito = imp;
+      }
+      prev = m.saldo;
+    }
+    if (c.saldoFinalDecl !== null && c.movs.length > 0 &&
+        !igualCent(c.movs[c.movs.length - 1].saldo, c.saldoFinalDecl))
+      avisos.push(c.nombre + ': el último saldo extraído (' + fmt(c.movs[c.movs.length-1].saldo) +
+                  ') no coincide con el SALDO FINAL declarado (' + fmt(c.saldoFinalDecl) + ').');
+    if (c.saldoInicial === null && c.movs.length > 0)
+      avisos.push(c.nombre + ': no se encontró "SALDO ANTERIOR", no se pudo validar la cadena desde el inicio.');
+  }
+
+  if (cuentas.length === 0) avisos.push('No se encontraron secciones de cuenta del HSBC en este archivo.');
+
+  // el saldo final a contrastar es el de la cuenta dueña del último movimiento
+  let declarado = null;
+  for (let i = cuentas.length - 1; i >= 0; i--){
+    if (cuentas[i].movs.length > 0){
+      if (cuentas[i].saldoFinalDecl !== null) declarado = {saldoFinal: cuentas[i].saldoFinalDecl};
+      break;
+    }
+  }
+  return {movs: movs, avisos: avisos,
+          saldoInicial: cuentas.length ? cuentas[0].saldoInicial : null,
+          declarado: declarado, clasifPorSaldo: true, cadenaValidadaPorCuenta: true};
+}
+
+/* ============================================================
+   Parser: BANCO MACRO
+   -------------------------------------------------------------
+   Encabezado: FECHA DESCRIPCION REFERENCIA DEBITOS CREDITOS SALDO
+   Resumen multi-cuenta: cada cuenta abre con
+   "<TIPO DE CUENTA> NRO.: <nro>" (ese encabezado se REPITE en cada
+   página, por eso las cuentas se indexan por número y se reutilizan),
+   arranca en "SALDO ULTIMO EXTRACTO AL <fecha> <saldo>" y cierra en
+   "SALDO FINAL AL DIA <fecha> <saldo>".
+
+   Movimiento: DD/MM/AA DESCRIPCION [referencia] IMPORTE SALDO
+   El importe NO viene firmado (columnas DEBITOS / CREDITOS), así que se
+   clasifica comparando saldoPrevio ± importe contra el saldo impreso.
+   Los códigos de referencia (CUIT, nro. de comprobante) son enteros sin
+   decimales, así que no los toma NUM_RE_SRC.
+
+   Ojo: el saldo puede ser NEGATIVO y se imprime con el menos adelante
+   ("-125.409,41"); NUM_RE_SRC ya lo contempla. Si se ignorara el signo,
+   la clasificación débito/crédito fallaría en esas filas y en todas las
+   siguientes hasta que el saldo vuelva a ser positivo.
+
+   Cada movimiento ocupa una sola línea: las líneas que no empiezan con
+   fecha son membrete, encabezados o texto legal y se descartan (no se
+   anexan al detalle).
+   ============================================================ */
+function parseMacroExtracto(paginas){
+  const movs = [];
+  const avisos = [];
+  const cuentas = [];              // {nombre, saldoInicial, saldoFinalDecl, movs:[]}
+  const porNumero = {};            // el encabezado de cuenta se repite en cada página
+  let cuenta = null;
+
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea).toUpperCase();
+
+      // apertura (o reapertura en la página siguiente) de una cuenta
+      const mCta = linea.match(/^((?:CUENTA|CAJA)\s.*?)\s+NRO\.:\s*(\S+)/i);
+      if (mCta){
+        const nro = mCta[2];
+        if (!porNumero[nro]){
+          porNumero[nro] = {nombre: mCta[1].trim() + ' ' + nro, saldoInicial: null,
+                            saldoFinalDecl: null, movs: []};
+          cuentas.push(porNumero[nro]);
+        }
+        cuenta = porNumero[nro];
+        continue;
+      }
+      if (!cuenta) continue;
+
+      const mIni = linea.match(/^SALDO ULTIMO EXTRACTO AL \S+\s+(.+)$/i);
+      if (mIni){
+        const mS = mIni[1].match(TAIL1_RE);
+        if (mS && cuenta.saldoInicial === null) cuenta.saldoInicial = parseNum(mS[1]);
+        continue;
+      }
+      const mFin = linea.match(/^SALDO FINAL AL DIA \S+\s+(.+)$/i);
+      if (mFin){
+        const mS = mFin[1].match(TAIL1_RE);
+        if (mS) cuenta.saldoFinalDecl = parseNum(mS[1]);
+        continue;
+      }
+      if (/^TOTAL COBRADO DEL IMP/.test(norm)) continue;
+
+      const mFecha = linea.match(/^(\d{2}\/\d{2}\/\d{2})\s+(.+)$/);
+      if (!mFecha) continue;   // membrete, encabezados, textos legales: se descartan
+      const resto = mFecha[2];
+      const mNums = resto.match(TAIL2_RE);
+      if (!mNums){
+        avisos.push('Línea con fecha sin importe+saldo: "' + linea + '"');
+        continue;
+      }
+      const mov = {
+        fecha: mFecha[1],
+        detalle: resto.slice(0, resto.length - mNums[0].length).trim(),
+        credito: null, debito: null,
+        saldo: parseNum(mNums[2]),
+        cuenta: cuenta.nombre, error: false
+      };
+      mov.__importe = Math.abs(parseNum(mNums[1]));
+      movs.push(mov);
+      cuenta.movs.push(mov);
+    }
+  }
+
+  // clasificación crédito/débito y validación de la cadena, por cuenta
+  for (const c of cuentas){
+    let prev = c.saldoInicial;
+    for (const m of c.movs){
+      const imp = m.__importe;
+      delete m.__importe;
+      if (prev !== null && igualCent(prev + imp, m.saldo)) m.credito = imp;
+      else if (prev !== null && igualCent(prev - imp, m.saldo)) m.debito = imp;
+      else {
+        m.error = true;
+        if (prev === null || m.saldo >= prev) m.credito = imp; else m.debito = imp;
+      }
+      prev = m.saldo;
+    }
+    if (c.saldoInicial === null && c.movs.length > 0)
+      avisos.push(c.nombre + ': no se encontró "SALDO ULTIMO EXTRACTO", no se pudo validar la cadena desde el inicio.');
+    if (c.saldoFinalDecl !== null && c.movs.length > 0 &&
+        !igualCent(c.movs[c.movs.length - 1].saldo, c.saldoFinalDecl))
+      avisos.push(c.nombre + ': el último saldo extraído (' + fmt(c.movs[c.movs.length-1].saldo) +
+                  ') no coincide con el SALDO FINAL declarado (' + fmt(c.saldoFinalDecl) + ').');
+  }
+
+  if (cuentas.length === 0) avisos.push('No se encontraron secciones de cuenta del Banco Macro en este archivo.');
+
+  // el saldo final a contrastar es el de la cuenta dueña del último movimiento
+  let declarado = null;
+  for (let i = cuentas.length - 1; i >= 0; i--){
+    if (cuentas[i].movs.length > 0){
+      if (cuentas[i].saldoFinalDecl !== null) declarado = {saldoFinal: cuentas[i].saldoFinalDecl};
+      break;
+    }
+  }
+  return {movs: movs, avisos: avisos,
+          saldoInicial: cuentas.length ? cuentas[0].saldoInicial : null,
+          declarado: declarado, clasifPorSaldo: true, cadenaValidadaPorCuenta: true};
+}
+
+/* ============================================================
+   Parser: BANCO CIUDAD
+   -------------------------------------------------------------
+   Encabezado: FECHA CONCEPTO DÉBITO CRÉDITO SALDO DESCRIPCIÓN DE MOVIMIENTO
+   Movimiento: DD-MES-AAAA CONCEPTO IMPORTE SALDO [DESCRIPCIÓN]
+
+   Tres cosas propias de este banco:
+
+   1) La DESCRIPCIÓN va DESPUÉS del saldo ("... 27.927,02 517.335,35
+      30718072162-PENA T"), así que los importes son los DOS PRIMEROS números
+      decimales de la línea, nunca los dos últimos como en el resto de los
+      bancos. La descripción trae CUIT y texto pegado sin decimales, por eso
+      no interfiere.
+
+   2) El SALDO ANTERIOR viene embutido en la línea del título del resumen
+      ("RESUMEN DE CUENTA DOCUMENTACIÓN COMERCIAL SALDO ANTERIOR 489.408,33"),
+      no en una línea propia; en las páginas siguientes ese mismo título
+      aparece SIN importe.
+
+   3) Las líneas "DD-MES-AAAA TRANSPORTE <saldo>" son el arrastre entre
+      páginas (aparecen al pie de una página y al tope de la siguiente): se
+      usan como punto de control de la cadena, no son movimientos.
+
+   El importe no viene firmado (columnas DÉBITO / CRÉDITO), así que se
+   clasifica comparando saldoPrevio ± importe contra el saldo impreso. El
+   saldo puede ser negativo y se imprime con el menos AL FINAL ("83.857,30-",
+   estilo contable, igual que Galicia); NUM_RE_SRC ya lo contempla.
+
+   Cierre: "... SALDO AL <fecha> <saldo>" (la línea trae antes un
+   "IMP.TRANS.FINAN $ 6212,1" con un solo decimal, que no matchea NUM_RE_SRC
+   y por eso no se confunde con el saldo).
+   ============================================================ */
+function parseCiudad(paginas){
+  const movs = [];
+  const avisos = [];
+  let saldoAnterior = null, saldoFinalDecl = null;
+  let saldoPrevio = null;
+  const sinInterpretar = [];
+
+  for (const lineas of paginas){
+    let estado = 'antes';          // el encabezado de tabla se repite en cada página
+    for (const linea of lineas){
+      const norm = sinAcentos(linea).toUpperCase();
+      const compacta = norm.replace(/\s/g, '');
+
+      // título del resumen: en la primera página trae el SALDO ANTERIOR
+      if (compacta.indexOf('SALDOANTERIOR') !== -1){
+        if (saldoAnterior === null){
+          const mS = linea.match(TAIL1_RE);
+          if (mS){ saldoAnterior = parseNum(mS[1]); saldoPrevio = saldoAnterior; }
+        }
+        continue;
+      }
+      if (/FECHA CONCEPTO DEBITO CREDITO SALDO DESCRIPCION DE MOVIMIENTO/.test(norm)){
+        estado = 'en';
+        continue;
+      }
+      if (estado !== 'en') continue;
+
+      // cierre del extracto
+      if (/\bSALDO AL\b/.test(norm)){
+        const mS = linea.match(TAIL1_RE);
+        if (mS) saldoFinalDecl = parseNum(mS[1]);
+        estado = 'fin';
+        continue;
+      }
+
+      const mFecha = linea.match(/^(\d{2}-[A-Za-z]{3}-\d{4})\s+(.+)$/);
+      if (!mFecha){
+        // membrete y pies que se repiten por página
+        if (/^HOJA NRO/.test(norm)) continue;
+        if (/^CUIT:/.test(norm) || /^DOMICILIO:/.test(norm)) continue;
+        if (/^CIUDAD AUTONOMA DE BUENOS AIRES$/.test(norm)) continue;
+        if (/^(SUCURSAL N|SISTEMA CUENTA|TIPO DE CUENTA|CUENTA NUMERO|CBU|CUIL\/CUIT\/CDI)/.test(norm)) continue;
+        sinInterpretar.push(linea);
+        continue;
+      }
+
+      const resto = mFecha[2];
+      const nums = resto.match(NUM_G_RE) || [];
+
+      // arrastre entre páginas: punto de control, no es un movimiento
+      if (/^TRANSPORTE\b/i.test(resto)){
+        if (nums.length && saldoPrevio !== null && !igualCent(parseNum(nums[0]), saldoPrevio))
+          avisos.push('El TRANSPORTE de página (' + fmt(parseNum(nums[0])) +
+                      ') no coincide con el saldo acumulado (' + fmt(saldoPrevio) + ').');
+        continue;
+      }
+
+      if (nums.length < 2){
+        avisos.push('Línea con fecha sin importe+saldo: "' + linea + '"');
+        continue;
+      }
+      // los importes son los DOS PRIMEROS decimales: la descripción va después del saldo
+      const importe = Math.abs(parseNum(nums[0]));
+      const saldo = parseNum(nums[1]);
+      const i0 = resto.indexOf(nums[0]);
+      const i1 = resto.indexOf(nums[1], i0 + nums[0].length);
+      const concepto = resto.slice(0, i0).trim();
+      const descripcion = resto.slice(i1 + nums[1].length).trim();
+
+      let credito = null, debito = null, error = false;
+      if (saldoPrevio !== null && igualCent(saldoPrevio + importe, saldo)) credito = importe;
+      else if (saldoPrevio !== null && igualCent(saldoPrevio - importe, saldo)) debito = importe;
+      else {
+        error = true;
+        if (saldoPrevio === null || saldo >= saldoPrevio) credito = importe; else debito = importe;
+      }
+      movs.push({
+        fecha: mFecha[1],
+        detalle: descripcion ? concepto + ' | ' + descripcion : concepto,
+        credito: credito, debito: debito, saldo: saldo, cuenta: null, error: error
+      });
+      saldoPrevio = saldo;
+    }
+  }
+
+  if (saldoAnterior === null)
+    avisos.push('No se encontró el "SALDO ANTERIOR" del resumen de Banco Ciudad.');
+  if (sinInterpretar.length > 0)
+    avisos.push(sinInterpretar.length + ' línea(s) de la zona de movimientos no se pudieron interpretar. La primera: "' + sinInterpretar[0] + '"');
+  if (movs.length === 0 && saldoAnterior !== null && saldoFinalDecl !== null && igualCent(saldoAnterior, saldoFinalDecl))
+    avisos.push('El período no registra movimientos: el saldo anterior ($ ' + fmt(saldoAnterior) +
+                ') es igual al saldo final declarado. No es un error.');
+
+  const declarado = (saldoFinalDecl !== null && movs.length > 0) ? {saldoFinal: saldoFinalDecl} : null;
+  return {movs: movs, avisos: avisos, saldoInicial: saldoAnterior,
+          declarado: declarado, clasifPorSaldo: true};
+}
+
+/* ============================================================
+   Parser: BANCO MACRO — variante "Últimos Movimientos"
+   -------------------------------------------------------------
+   Es el export del home banking, NO el extracto mensual: otro
+   encabezado, otra estructura y otras reglas.
+
+   Encabezado: "Fecha Nro. de Causal Concepto Importe Saldo" con la palabra
+   "Referencia" cayendo en la línea siguiente (el título de columna se parte
+   en dos renglones).
+   Movimiento: DD/MM/AAAA <nro.referencia> <causal> <concepto> $ <importe> $ <saldo>
+
+   Dos diferencias clave con el extracto mensual:
+
+   1) Acá el importe SÍ viene firmado ("$ -2.282,90" débito, "$ 39.686,09"
+      crédito), así que no hace falta deducirlo de la variación del saldo.
+      El signo va después del "$"; NUM_RE_SRC ya acepta esa forma.
+
+   2) La lista viene en orden CRONOLÓGICO INVERSO (el movimiento más nuevo
+      primero), de modo que cada fila cuadra con la de ABAJO:
+      saldo[i] = saldo[i+1] + importe[i]. Se da vuelta al final para dejarla
+      en el mismo orden que el resto de los bancos (del más viejo al más
+      nuevo) y que la cadena de saldos se valide de la forma habitual.
+
+   Este export no imprime saldo inicial ni final declarados: la única
+   verificación posible es la cadena interna entre movimientos.
+   ============================================================ */
+function parseMacroMovimientos(paginas){
+  const movs = [];
+  const avisos = [];
+  let cuentaNro = null, moneda = null, tipoCuenta = null;
+
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea).toUpperCase();
+
+      const mNro = linea.match(/^N[úu]mero\s+(\S+)/i);
+      if (mNro){ cuentaNro = mNro[1]; continue; }
+      const mMon = linea.match(/^Moneda\s+(.+)$/i);
+      if (mMon){ moneda = mMon[1].trim(); continue; }
+      if (/^(CUENTA CORRIENTE|CAJA DE AHORRO)/.test(norm) && !/\d{2}\/\d{2}\/\d{4}/.test(norm)){
+        tipoCuenta = linea.trim(); continue;
+      }
+
+      // encabezados y pies que se repiten por página
+      if (/^FECHA NRO\.? DE CAUSAL CONCEPTO IMPORTE SALDO/.test(norm)) continue;
+      if (/^REFERENCIA$/.test(norm)) continue;
+      if (/^ULTIMOS MOVIMIENTOS$/.test(norm)) continue;
+      if (/^TIPO /.test(norm)) continue;
+      if (/^\d+ DE \d+$/.test(norm)) continue;
+      if (/^FECHA DE DESCARGA/.test(norm)) continue;
+      if (/^(EMPRESA|OPERADOR)\s*:/.test(norm)) continue;
+
+      const mFecha = linea.match(/^(\d{2}\/\d{2}\/\d{4})\s+(.+)$/);
+      if (!mFecha) continue;
+      const resto = mFecha[2];
+      const mNums = resto.match(TAIL2_RE);
+      if (!mNums){
+        avisos.push('Línea con fecha sin importe+saldo: "' + linea + '"');
+        continue;
+      }
+      const importe = parseNum(mNums[1]);          // ya viene firmado
+      const saldo = parseNum(mNums[2]);
+      movs.push({
+        fecha: mFecha[1],
+        detalle: resto.slice(0, resto.length - mNums[0].length).trim(),
+        credito: importe > 0 ? importe : null,
+        debito: importe < 0 ? Math.abs(importe) : null,
+        saldo: saldo, cuenta: null, error: false
+      });
+    }
+  }
+
+  // del más nuevo al más viejo -> se invierte para dejarlo cronológico
+  movs.reverse();
+
+  const etiqueta = (tipoCuenta ? tipoCuenta : 'Cuenta') + (cuentaNro ? ' ' + cuentaNro : '') +
+                   (moneda ? ' (' + moneda + ')' : '');
+  if (cuentaNro) for (const m of movs) m.cuenta = etiqueta;
+
+  if (movs.length === 0) avisos.push('No se encontraron movimientos en el listado de Banco Macro.');
+  else avisos.push('Este export de Macro ("Últimos Movimientos") no declara saldo inicial ni final, ' +
+    'así que la verificación es la cadena entre movimientos. Las filas venían del más nuevo al más viejo: ' +
+    'se reordenaron cronológicamente, igual que el resto de los bancos.');
+
+  return {movs: movs, avisos: avisos, saldoInicial: null, declarado: null, clasifPorSaldo: false};
+}
+
+/* Macro tiene dos formatos calibrados; se elige por el encabezado de tabla. */
+function parseMacro(paginas){
+  for (const lineas of paginas){
+    for (const linea of lineas){
+      const norm = sinAcentos(linea).toUpperCase();
+      if (/^FECHA NRO\.? DE CAUSAL CONCEPTO IMPORTE SALDO/.test(norm)) return parseMacroMovimientos(paginas);
+      if (/FECHA DESCRIPCION REFERENCIA DEBITOS CREDITOS SALDO/.test(norm)) return parseMacroExtracto(paginas);
+    }
+  }
+  // sin encabezado reconocible: se intenta con el extracto mensual, que avisa si no encuentra cuentas
+  return parseMacroExtracto(paginas);
+}
+
+const PARSERS = {
+  galicia: parseGalicia, bancor: parseBancor, frances: parseFrances,
+  nacion: parseNacion, mercadopago: parseMercadoPago, santander: parseSantander,
+  icbc: parseICBC, hsbc: parseHSBC, macro: parseMacro, ciudad: parseCiudad
+};
+
+/* ============================================================
+   Entrada Excel / CSV (SheetJS): mapeo de columnas por nombre
+   ============================================================ */
+function parseExcel(arrayBuffer, nombreArchivo){
+  const wb = XLSX.read(arrayBuffer, {type: 'array', cellDates: false});
+  const movs = [];
+  const avisos = [];
+  const CANDIDATOS = {
+    fecha: ['fecha'],
+    detalle: ['descripcion', 'detalle', 'concepto', 'movimiento', 'movimientos', 'leyenda', 'operacion'],
+    credito: ['credito', 'creditos', 'entradas', 'haber', 'entrada o creditos', 'entrada'],
+    debito: ['debito', 'debitos', 'salidas', 'debe', 'salidas o debitos', 'salida'],
+    importe: ['importe', 'valor', 'monto'],
+    saldo: ['saldo']
+  };
+  function buscarCol(encabezados, nombres){
+    for (let i = 0; i < encabezados.length; i++){
+      const h = sinAcentos(String(encabezados[i] || '')).toLowerCase().trim();
+      if (nombres.some(n => h === n || h.startsWith(n + ' ') || h.indexOf(n) === 0)) return i;
+    }
+    return -1;
+  }
+  for (const nombreHoja of wb.SheetNames){
+    const hoja = wb.Sheets[nombreHoja];
+    const filas = XLSX.utils.sheet_to_json(hoja, {header: 1, raw: true, defval: ''});
+    let filaEnc = -1, cols = null;
+    for (let r = 0; r < Math.min(filas.length, 30); r++){
+      const enc = filas[r].map(c => String(c));
+      const iFecha = buscarCol(enc, CANDIDATOS.fecha);
+      if (iFecha === -1) continue;
+      const c = {
+        fecha: iFecha,
+        detalle: buscarCol(enc, CANDIDATOS.detalle),
+        credito: buscarCol(enc, CANDIDATOS.credito),
+        debito: buscarCol(enc, CANDIDATOS.debito),
+        importe: buscarCol(enc, CANDIDATOS.importe),
+        saldo: buscarCol(enc, CANDIDATOS.saldo)
+      };
+      if (c.credito !== -1 || c.debito !== -1 || c.importe !== -1){ filaEnc = r; cols = c; break; }
+    }
+    if (filaEnc === -1) continue;
+    function leerNum(v){
+      if (v === '' || v === null || v === undefined) return null;
+      if (typeof v === 'number') return v;
+      const s = String(v).trim();
+      if (!s) return null;
+      if (new RegExp('^' + NUM_RE_SRC + '$').test(s)) return parseNum(s);
+      const f = parseFloat(s.replace(',', '.'));
+      return isNaN(f) ? null : f;
+    }
+    for (let r = filaEnc + 1; r < filas.length; r++){
+      const fila = filas[r];
+      let fecha = fila[cols.fecha];
+      if (fecha === '' || fecha === null || fecha === undefined) continue;
+      if (typeof fecha === 'number') fecha = XLSX.SSF.format('dd/mm/yyyy', fecha);
+      fecha = String(fecha).trim();
+      if (!/\d/.test(fecha)) continue;
+      let credito = null, debito = null;
+      if (cols.importe !== -1 && cols.credito === -1 && cols.debito === -1){
+        const v = leerNum(fila[cols.importe]);
+        if (v === null) continue;
+        if (v >= 0) credito = v; else debito = Math.abs(v);
+      } else {
+        const vc = cols.credito !== -1 ? leerNum(fila[cols.credito]) : null;
+        const vd = cols.debito !== -1 ? leerNum(fila[cols.debito]) : null;
+        if (vc === null && vd === null) continue;
+        if (vc !== null && vc !== 0) credito = Math.abs(vc);
+        if (vd !== null && vd !== 0) debito = Math.abs(vd);
+      }
+      const saldo = cols.saldo !== -1 ? leerNum(fila[cols.saldo]) : null;
+      const detalle = cols.detalle !== -1 ? String(fila[cols.detalle] || '').trim() : '';
+      movs.push({fecha: fecha, detalle: detalle, credito: credito, debito: debito, saldo: saldo, cuenta: null, error: false});
+    }
+  }
+  if (movs.length === 0)
+    avisos.push('No se reconocieron columnas de movimientos en "' + nombreArchivo + '". Pasame este archivo como ejemplo para calibrar su formato.');
+  // validar cadena de saldos si hay saldo
+  let prev = null;
+  for (const m of movs){
+    if (m.saldo !== null && prev !== null && !igualCent(prev + (m.credito || 0) - (m.debito || 0), m.saldo)) m.error = true;
+    if (m.saldo !== null) prev = m.saldo;
+  }
+  return {movs: movs, avisos: avisos, saldoInicial: null, declarado: null, clasifPorSaldo: false, cadenaYaValidada: true};
+}
+
+/* ============================================================
+   Validación común (cadena de saldos + totales declarados)
+   ============================================================ */
+function validarResultado(res){
+  const val = []; // {tipo:'ok'|'error'|'aviso', msj}
+  const movs = res.movs;
+  // Cadena de saldos (si el parser no la validó ya por cuenta)
+  if (!res.cadenaYaValidada && !res.cadenaValidadaPorCuenta){
+    let prev = res.saldoInicial;
+    for (const m of movs){
+      if (prev !== null && !igualCent(prev + (m.credito || 0) - (m.debito || 0), m.saldo)) m.error = true;
+      prev = m.saldo;
+    }
+  }
+  const errores = movs.filter(m => m.error).length;
+  if (movs.length > 0){
+    if (errores === 0) val.push({tipo: 'ok', msj: 'Cadena de saldos verificada: los ' + movs.length + ' movimientos cierran exactos (saldo anterior ± importe = saldo).'});
+    else val.push({tipo: 'error', msj: errores + ' movimiento(s) NO cierran con la cadena de saldos — marcados en rojo. Revisalos antes de usar el Excel.'});
+  }
+  // Totales declarados por el banco
+  const sumaCred = movs.reduce((s,m) => s + (m.credito || 0), 0);
+  const sumaDeb = movs.reduce((s,m) => s + (m.debito || 0), 0);
+  const d = res.declarado;
+  if (d){
+    if (d.creditos !== undefined){
+      if (igualCent(sumaCred, d.creditos)) val.push({tipo: 'ok', msj: 'Créditos extraídos = total declarado por el banco: $ ' + fmt(d.creditos)});
+      else val.push({tipo: 'error', msj: 'Créditos extraídos ($ ' + fmt(sumaCred) + ') ≠ total declarado ($ ' + fmt(d.creditos) + '). Diferencia: $ ' + fmt(sumaCred - d.creditos)});
+    }
+    if (d.debitos !== undefined){
+      if (igualCent(sumaDeb, d.debitos)) val.push({tipo: 'ok', msj: 'Débitos extraídos = total declarado por el banco: $ ' + fmt(d.debitos)});
+      else val.push({tipo: 'error', msj: 'Débitos extraídos ($ ' + fmt(sumaDeb) + ') ≠ total declarado ($ ' + fmt(d.debitos) + '). Diferencia: $ ' + fmt(sumaDeb - d.debitos)});
+    }
+    if (d.saldoFinal !== undefined && movs.length > 0){
+      const ultimo = movs[movs.length - 1].saldo;
+      if (igualCent(ultimo, d.saldoFinal)) val.push({tipo: 'ok', msj: 'Saldo final coincide con el declarado: $ ' + fmt(d.saldoFinal)});
+      else val.push({tipo: 'error', msj: 'Último saldo extraído ($ ' + fmt(ultimo) + ') ≠ saldo final declarado ($ ' + fmt(d.saldoFinal) + ').'});
+    }
+  }
+  for (const a of res.avisos) val.push({tipo: 'aviso', msj: a});
+  return val;
+}
+
+/* ============================================================
+   Estado global y procesamiento de archivos
+   ============================================================ */
+const ESTADO = { archivos: [] }; // {nombre, banco, res, validaciones}
+
+async function procesarArrayBuffer(nombre, arrayBuffer, bancoForzado){
+  const ext = nombre.toLowerCase().split('.').pop();
+  if (ext === 'pdf'){
+    const datos = new Uint8Array(arrayBuffer);
+    const {paginas, textoCompleto} = await pdfALineas(datos);
+    const detectado = detectarBanco(textoCompleto, paginas);
+    let banco = (bancoForzado && bancoForzado !== 'auto') ? bancoForzado : detectado;
+    const avisosExtra = [];
+    if (!banco){
+      // ¿es un resumen de tarjeta? en ese caso corresponde el otro módulo
+      const esTarjeta = /DETALLE DEL CONSUMO/i.test(sinAcentos(textoCompleto))
+                        || /TARJETA \d+ Total Consumos de/i.test(textoCompleto);
+      const msj = esTarjeta
+        ? '"' + nombre + '" parece ser un resumen de TARJETA DE CRÉDITO, no un extracto bancario. Usá el módulo "Tarjetas de Crédito" desde el inicio.'
+        : 'No pude identificar el banco de "' + nombre + '". Elegí el banco manualmente en el selector; si ya lo hiciste, necesito este resumen como ejemplo para calibrarlo.';
+      return {nombre: nombre, banco: null, res: {movs: [], avisos: [msj], saldoInicial: null, declarado: null}, };
+    }
+    if (bancoForzado && bancoForzado !== 'auto' && detectado && detectado !== bancoForzado){
+      avisosExtra.push('Elegiste "' + NOMBRES_BANCO[bancoForzado] + '" pero el archivo parece ser de "' + NOMBRES_BANCO[detectado] + '". Se procesó con el parser de ' + NOMBRES_BANCO[bancoForzado] + ' — verificá el resultado.');
+    }
+    const res = PARSERS[banco](paginas);
+    res.avisos = avisosExtra.concat(res.avisos);
+    return {nombre: nombre, banco: banco, res: res};
+  }
+  // Excel / CSV
+  const res = parseExcel(arrayBuffer, nombre);
+  return {nombre: nombre, banco: 'excel', res: res};
+}
+
+async function procesarArchivos(lista){
+  const banco = document.getElementById('selBanco').value;
+  const estadoEl = document.getElementById('estado');
+  estadoEl.classList.remove('oculto');
+  for (const archivo of lista){
+    estadoEl.textContent = 'Procesando ' + archivo.name + '…';
+    try {
+      const buf = await archivo.arrayBuffer();
+      const r = await procesarArrayBuffer(archivo.name, buf, banco);
+      r.validaciones = validarResultado(r.res);
+      ESTADO.archivos.push(r);
+    } catch (e){
+      ESTADO.archivos.push({nombre: archivo.name, banco: null,
+        res: {movs: [], avisos: ['Error al procesar: ' + e.message], saldoInicial: null, declarado: null},
+        validaciones: [{tipo: 'error', msj: 'Error al procesar "' + archivo.name + '": ' + e.message}]});
+    }
+  }
+  estadoEl.classList.add('oculto');
+  render();
+}
+
+/* ============================================================
+   Render de resultados
+   ============================================================ */
+function todosLosMovs(){
+  const filas = [];
+  for (const a of ESTADO.archivos){
+    for (const m of a.res.movs){
+      filas.push({archivo: a.nombre, banco: a.banco ? (NOMBRES_BANCO[a.banco] || a.banco) : '', mov: m});
+    }
+  }
+  return filas;
+}
+
+function columnasSalida(){
+  const filas = todosLosMovs();
+  const variosArchivos = ESTADO.archivos.length > 1;
+  const cuentas = new Set(filas.filter(f => f.mov.cuenta).map(f => f.mov.cuenta));
+  const conCuenta = cuentas.size > 1 || (cuentas.size === 1 && filas.some(f => !f.mov.cuenta));
+  const cols = [];
+  if (variosArchivos){ cols.push('Banco'); cols.push('Archivo'); }
+  if (conCuenta) cols.push('Cuenta');
+  cols.push('Fecha', 'Detalle', 'Créditos (Entradas)', 'Débitos (Salidas)', 'Saldo');
+  return {cols: cols, variosArchivos: variosArchivos, conCuenta: conCuenta};
+}
+
+const LIMITE_VISTA = 1000;
+
+function render(){
+  const cont = document.getElementById('resultados');
+  const filas = todosLosMovs();
+  if (ESTADO.archivos.length === 0){ cont.classList.add('oculto'); return; }
+  cont.classList.remove('oculto');
+
+  const sumaCred = filas.reduce((s,f) => s + (f.mov.credito || 0), 0);
+  const sumaDeb = filas.reduce((s,f) => s + (f.mov.debito || 0), 0);
+  const conError = filas.filter(f => f.mov.error).length;
+
+  document.getElementById('chips').innerHTML =
+    '<div class="chip"><div class="valor">' + filas.length + '</div><div class="etiqueta">Movimientos</div></div>' +
+    '<div class="chip cred"><div class="valor">$ ' + fmt(sumaCred) + '</div><div class="etiqueta">Total créditos</div></div>' +
+    '<div class="chip deb"><div class="valor">$ ' + fmt(sumaDeb) + '</div><div class="etiqueta">Total débitos</div></div>' +
+    '<div class="chip"><div class="valor" style="color:' + (conError ? 'var(--rojo)' : 'var(--verde)') + '">' +
+      (conError ? conError + ' ⚠' : '✓') + '</div><div class="etiqueta">' + (conError ? 'Filas con error' : 'Validación') + '</div></div>';
+
+  let html = '';
+  for (const a of ESTADO.archivos){
+    html += '<div style="font-weight:600; font-size:13.5px; margin:8px 0 6px;">📄 ' + escaparHtml(a.nombre) +
+            (a.banco ? ' — ' + (NOMBRES_BANCO[a.banco] || a.banco) : '') +
+            ' <span style="font-weight:400;color:#6b7a89;">(' + a.res.movs.length + ' movimientos)</span></div>';
+    for (const v of a.validaciones){
+      const clase = v.tipo === 'ok' ? 'val-ok' : (v.tipo === 'error' ? 'val-error' : 'val-aviso');
+      const icono = v.tipo === 'ok' ? '✓' : (v.tipo === 'error' ? '✗' : '⚠');
+      html += '<div class="val-item ' + clase + '"><span>' + icono + '</span><span>' + escaparHtml(v.msj) + '</span></div>';
+    }
+  }
+  document.getElementById('panelValidacion').innerHTML = html;
+
+  const {cols, variosArchivos, conCuenta} = columnasSalida();
+  document.querySelector('#tabla thead').innerHTML =
+    '<tr>' + cols.map(c => '<th>' + escaparHtml(c) + '</th>').join('') + '</tr>';
+
+  const cuerpo = [];
+  const visibles = filas.slice(0, LIMITE_VISTA);
+  for (const f of visibles){
+    const m = f.mov;
+    const celdas = [];
+    if (variosArchivos){ celdas.push('<td>' + escaparHtml(f.banco) + '</td>'); celdas.push('<td>' + escaparHtml(f.archivo) + '</td>'); }
+    if (conCuenta) celdas.push('<td>' + escaparHtml(m.cuenta || '') + '</td>');
+    celdas.push('<td>' + escaparHtml(m.fecha) + '</td>');
+    celdas.push('<td class="detalle-celda">' + escaparHtml(m.detalle) + '</td>');
+    celdas.push('<td class="num cred">' + (m.credito !== null ? fmt(m.credito) : '') + '</td>');
+    celdas.push('<td class="num deb">' + (m.debito !== null ? fmt(m.debito) : '') + '</td>');
+    celdas.push('<td class="num">' + (m.saldo !== null ? fmt(m.saldo) : '') + '</td>');
+    cuerpo.push('<tr' + (m.error ? ' class="fila-error" title="Esta fila no cierra con la cadena de saldos del resumen"' : '') + '>' + celdas.join('') + '</tr>');
+  }
+  document.querySelector('#tabla tbody').innerHTML = cuerpo.join('');
+  document.getElementById('notaFilas').textContent =
+    filas.length > LIMITE_VISTA
+      ? 'Mostrando ' + LIMITE_VISTA + ' de ' + filas.length + ' movimientos (el Excel incluye todos).'
+      : filas.length + ' movimiento(s) listos para exportar.';
+  document.getElementById('btnDescargar').disabled = filas.length === 0;
+}
+
+/* ============================================================
+   Exportación a Excel
+   ============================================================ */
+function descargarExcel(){
+  const filas = todosLosMovs();
+  if (filas.length === 0) return;
+  const {cols, variosArchivos, conCuenta} = columnasSalida();
+  const aoa = [cols];
+  for (const f of filas){
+    const m = f.mov;
+    const fila = [];
+    if (variosArchivos){ fila.push(f.banco); fila.push(f.archivo); }
+    if (conCuenta) fila.push(m.cuenta || '');
+    fila.push(m.fecha, m.detalle,
+      m.credito !== null ? m.credito : '',
+      m.debito !== null ? m.debito : '',
+      m.saldo !== null ? m.saldo : '');
+    aoa.push(fila);
+  }
+  const sumaCred = filas.reduce((s,f) => s + (f.mov.credito || 0), 0);
+  const sumaDeb = filas.reduce((s,f) => s + (f.mov.debito || 0), 0);
+  const filaTot = new Array(cols.length).fill('');
+  filaTot[cols.indexOf('Detalle')] = 'TOTALES';
+  filaTot[cols.indexOf('Créditos (Entradas)')] = Math.round(sumaCred * 100) / 100;
+  filaTot[cols.indexOf('Débitos (Salidas)')] = Math.round(sumaDeb * 100) / 100;
+  aoa.push(filaTot);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // formato numérico en columnas de importes
+  const idxNum = ['Créditos (Entradas)', 'Débitos (Salidas)', 'Saldo'].map(n => cols.indexOf(n));
+  for (let r = 1; r < aoa.length; r++){
+    for (const c of idxNum){
+      if (c === -1) continue;
+      const ref = XLSX.utils.encode_cell({r: r, c: c});
+      if (ws[ref] && typeof ws[ref].v === 'number'){ ws[ref].t = 'n'; ws[ref].z = '#,##0.00'; }
+    }
+  }
+  const anchoDetalle = Math.min(80, Math.max(30, ...filas.map(f => f.mov.detalle.length)));
+  ws['!cols'] = cols.map(c => {
+    if (c === 'Detalle') return {wch: anchoDetalle};
+    if (c === 'Archivo') return {wch: 24};
+    if (c === 'Banco' || c === 'Cuenta') return {wch: 20};
+    if (c === 'Fecha') return {wch: 11};
+    return {wch: 16};
+  });
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+  const fechaHoy = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, 'movimientos_bancarios_' + fechaHoy + '.xlsx');
+}
+
+/* ============================================================
+   Eventos de la interfaz
+   ============================================================ */
+const zona = document.getElementById('zona');
+const inputArchivos = document.getElementById('inputArchivos');
+zona.addEventListener('click', () => inputArchivos.click());
+zona.addEventListener('dragover', e => { e.preventDefault(); zona.classList.add('arrastrando'); });
+zona.addEventListener('dragleave', () => zona.classList.remove('arrastrando'));
+zona.addEventListener('drop', e => {
+  e.preventDefault();
+  zona.classList.remove('arrastrando');
+  if (e.dataTransfer.files.length) procesarArchivos([...e.dataTransfer.files]);
+});
+inputArchivos.addEventListener('change', () => {
+  if (inputArchivos.files.length) procesarArchivos([...inputArchivos.files]);
+  inputArchivos.value = '';
+});
+document.getElementById('btnDescargar').addEventListener('click', descargarExcel);
+document.getElementById('btnLimpiar').addEventListener('click', () => { ESTADO.archivos = []; render(); });
+document.getElementById('selBanco').addEventListener('change', () => {
+  document.getElementById('notaBanco').style.display = 'none';
+});
+
+/* API interna para verificación automatizada */
+window.__APP__ = {
+  procesarArrayBuffer: procesarArrayBuffer,
+  validarResultado: validarResultado,
+  estado: ESTADO,
+  async testConUrl(url, banco){
+    const r = await fetch(url);
+    const buf = await r.arrayBuffer();
+    const res = await procesarArrayBuffer(decodeURIComponent(url.split('/').pop()), buf, banco || 'auto');
+    res.validaciones = validarResultado(res.res);
+    return res;
+  }
+};
+</script>
+</body>
+</html>
